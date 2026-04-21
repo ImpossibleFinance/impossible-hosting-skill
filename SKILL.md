@@ -20,6 +20,39 @@ The CLI help is always up-to-date and includes examples, flag descriptions, and 
 curl -fsSL https://impossible-api.fly.dev/install | sh
 ```
 
+This downloads the correct binary for the current OS/architecture (macOS/Linux, amd64/arm64)
+and installs it to `~/.local/bin/ifhost`. If `~/.local/bin` is not in PATH, add it:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Verify installation:
+
+```bash
+ifhost --help
+```
+
+If the install script fails (e.g., no curl, restricted network), manually download:
+
+```bash
+# macOS ARM (Apple Silicon)
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_darwin_arm64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# macOS Intel
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_darwin_amd64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# Linux x86_64
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_linux_amd64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# Linux ARM64
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_linux_arm64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+```
+
 ## Quick Start
 
 ```bash
