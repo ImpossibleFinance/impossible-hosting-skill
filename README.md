@@ -18,14 +18,50 @@ Or reference directly in a prompt:
 Use the ifhost skill to deploy this project.
 ```
 
+## Install the CLI
+
+```bash
+curl -fsSL https://impossible-api.fly.dev/install | sh
+```
+
+Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS and Linux (amd64/arm64).
+
+If the script fails, download directly:
+
+```bash
+# macOS ARM (Apple Silicon)
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_darwin_arm64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# macOS Intel
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_darwin_amd64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# Linux x86_64
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_linux_amd64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# Linux ARM64
+curl -fsSL https://impossible-api.fly.dev/dl/ifhost_linux_arm64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+```
+
+Then add to PATH if needed:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 ## What the agent learns
 
 - How to install and authenticate with ifhost
 - How to configure machine specs (`ifhost init`)
 - How to deploy (`ifhost deploy`)
-- Common patterns (static sites, APIs, heavy apps)
+- Common patterns (static sites, APIs, heavy apps, interactive setup)
+- Non-blocking log monitoring via tmux console
 - Traps to avoid (port mismatch, OOM, autostop, env vars)
-- Post-deploy management (logs, exec, stop, destroy)
+- Post-deploy management (logs, exec, console, scale, destroy)
+- Full command reference with flags and examples
 
 ## Example agent interaction
 
