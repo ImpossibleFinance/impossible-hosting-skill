@@ -11,18 +11,39 @@ Deploy any Dockerized app to the cloud with one command. Each app gets its own i
 
 ### 1. Understand the project BEFORE deploying
 
-**CRITICAL:** Before running `ifhost init` or `ifhost deploy`, you MUST:
+**CRITICAL:** Before running `ifhost init` or `ifhost deploy`, complete this checklist:
 
-1. Read the project's README, SETUP, or INSTALL docs
-2. Read the Dockerfile (or write one if missing)
-3. Read any config files (.env.example, config.yaml, docker-compose.yml) to find:
-   - What port the app listens on
-   - What environment variables and secrets are required (API keys, DB URLs, tokens)
-   - What setup steps run before the app serves (migrations, config generation, build steps)
-   - What RAM/CPU the app needs (Node.js/Python = 512MB+, AI/ML = 1024MB+)
-4. Ask the user for any missing secrets or credentials — never guess API keys
+**Step A — Read the docs:**
+- README.md, INSTALL.md, docs/install/ folder, or any setup guide
+- docker-compose.yml (shows ports, volumes, env vars, startup commands)
+- .env.example (lists ALL required env vars with descriptions)
+- Dockerfile (shows exposed port, build steps, CMD)
+- Any config file templates (config.example.json, etc.)
 
-Only after you understand the full setup should you configure impossible.toml and deploy.
+**Step B — Fill out this mental checklist:**
+```
+Port:        ___  (check Dockerfile EXPOSE, docker-compose ports, or --port flags)
+RAM:         ___  (512MB for small apps, 1024MB+ for Node/Python, 2048MB+ if build needs it)
+CPUs:        ___  (1 for simple, 2+ for AI/heavy compute)
+Autostop:    ___  (false if app takes >60s to boot)
+Env vars:    ___  (list every KEY=VALUE the app needs)
+Secrets:     ___  (API keys, tokens — ask the user, never guess)
+Startup cmd: ___  (if the app needs setup before serving: config generation, migrations)
+Bind address:___  (many apps default to localhost — must bind to 0.0.0.0 or use --bind lan)
+Storage:     ___  (does the app write config/data to disk? → storage = "local" or mount /data)
+```
+
+**Step C — Ask the user for anything missing:**
+- API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+- Bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.)
+- Database URLs
+- Any credentials you can't find in the docs
+
+**Step D — Present your deployment plan to the user BEFORE running any commands.**
+Show the impossible.toml you'll generate and the deploy command with all env/secret flags.
+Let the user confirm or correct before proceeding.
+
+Only after the user approves should you run `ifhost init` and `ifhost deploy`.
 
 ### 2. Tell the user what's happening
 
@@ -569,6 +590,40 @@ ifhost deploy --env DATABASE_URL=postgres://...
 ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1
 ifhost deploy --env OPENAI_API_KEY=sk-...
 ```
+
+### Complex app (custom port, config generation, multiple env vars)
+
+Many real-world apps need: a non-standard port, bind to 0.0.0.0, config files written
+before startup, and multiple API keys. Use `[build] cmd` to handle all setup:
+
+```toml
+app = "my-gateway"
+storage = "local"
+
+[service]
+internal_port = 18789
+autostop = false
+min_machines = 1
+
+[resources]
+cpu_kind = "shared"
+cpus = 2
+memory_mb = 2048
+
+[build]
+cmd = "mkdir -p /data/config && echo '{\"setting\":\"value\"}' > /data/config/app.json && node dist/index.js --bind lan --port 18789"
+
+[env]
+NODE_ENV = "production"
+STATE_DIR = "/data"
+```
+
+Key points:
+- `[build] cmd` runs on EVERY machine boot (including standby wakes) — put all setup here
+- Use `storage = "local"` if the app writes config/data to disk
+- `--bind lan` or `0.0.0.0` is required — apps binding to localhost are unreachable
+- Set `memory_mb = 2048` if the build step needs >1GB (Node.js/pnpm installs)
+- Pass secrets via `--secret` on deploy, not in the toml file
 
 ### SQLite app (single machine, persistent disk)
 ```bash
