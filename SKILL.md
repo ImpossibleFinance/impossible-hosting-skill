@@ -126,6 +126,28 @@ ifhost init --app my-app --port 3000 --memory 512     # Generate impossible.toml
 ifhost deploy                                         # Build + deploy
 ```
 
+## ⚡ FASTEST PATH (always try this first)
+
+If the project publishes a Docker image (most modern OSS projects do — check
+`ghcr.io/<org>/<repo>` or look for image refs in their README/docker-compose.yml):
+
+```bash
+ifhost init --app my-app --port <PORT> --memory 1024 --autostop=false --min-machines 1
+ifhost deploy --image ghcr.io/owner/project:latest \
+  --secret API_KEY=... \
+  --env CONFIG_VAR=value
+```
+
+**~30 seconds total** instead of 5-10 minutes for source builds.
+
+Examples of projects with published images: openclaw (`ghcr.io/openclaw/openclaw:latest`),
+most Node/Python web apps, all official Docker Hub images (nginx, redis, postgres, etc.).
+
+**How to check if a project publishes an image:**
+1. Look at the README for `docker pull` commands or `image:` lines in docker-compose.yml
+2. Visit `https://github.com/<owner>/<repo>/pkgs/container/<repo>` (GitHub Container Registry)
+3. Run `gh api /orgs/<owner>/packages?package_type=container 2>/dev/null` to list packages
+
 ---
 
 ## Command Reference
@@ -589,10 +611,25 @@ machine boot (including standby wakes). Shell features work: pipes, `&&`, `$ENV_
 from `[env]` are available as environment variables when `[build] cmd` runs. You can
 reference them: `echo "$API_KEY" > /data/config.json && node start.js`.
 
-**Apps that need a config file at boot:** Use `[build] cmd` to generate it from env vars:
+**Apps that need a config file at boot:** Use `[build] cmd` to generate it from env vars.
+The trick is `printf '%s' "$VAR"` — `printf` is the safest way to inject env values into JSON
+without shell-escape hell:
+
 ```toml
 [build]
-cmd = "mkdir -p /data && printf '{\"token\":\"%s\"}' \"$BOT_TOKEN\" > /data/config.json && node server.js"
+cmd = """mkdir -p /data && printf '{"token":"%s","model":"%s"}' "$BOT_TOKEN" "$MODEL" > /data/config.json && exec node server.js"""
+```
+
+Notes for writing this safely:
+- Use TOML triple-quotes `"""..."""` to avoid escaping `"` characters in the cmd
+- Use `printf '%s' "$VAR"` for any value that could contain special chars
+- End with `exec <real_cmd>` so the app process gets PID 1 (clean signals)
+- Test the `printf` locally first if escaping gets tricky
+
+For very complex configs, write a `setup.sh` script in your repo and run it:
+```toml
+[build]
+cmd = "bash /app/setup.sh && exec node server.js"
 ```
 
 **Secrets:** Pass via `--secret` on the deploy command, NOT in the toml file:
@@ -790,6 +827,41 @@ ifhost machines exec --app my-app -- cat /var/log/app.log
 # 7. If app won't start, check the deploy
 ifhost describe --app my-app --json | jq '.deployments[0]'
 ```
+
+---
+
+## Known Projects Cheat Sheet
+
+Pre-verified configs for popular projects. Saves you discovery time.
+
+### OpenClaw (Telegram/Discord/Slack AI bot)
+
+```bash
+ifhost init --app my-claw --port 18789 --memory 2048 --cpus 2 --autostop=false --min-machines 1 --storage local
+```
+
+Edit `impossible.toml` to add (replace `<TG_USER_ID>` with your numeric Telegram user ID):
+```toml
+[build]
+cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"]}}}' "$TELEGRAM_CHAT_ID" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 18789 --allow-unconfigured"""
+
+[env]
+NODE_ENV = "production"
+TELEGRAM_CHAT_ID = "<TG_USER_ID>"
+```
+
+Deploy:
+```bash
+ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
+  --secret OPENAI_API_KEY=sk-... \
+  --secret TELEGRAM_BOT_TOKEN=...
+```
+
+Gotchas:
+- Port is **18789**, not 8080 or 3000 (check Dockerfile HEALTHCHECK)
+- Config root key is `agents` (plural) — Zod schema overrides docs
+- `--bind lan` activates the Control UI — must set `controlUi.enabled = false` OR set `controlUi.allowedOrigins`
+- Telegram default DM policy needs pairing — use `dmPolicy: "allowlist"` with your numeric user ID to skip pairing
 
 ---
 
