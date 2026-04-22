@@ -75,7 +75,33 @@ Remove stored credentials.
 
 ### ifhost status
 
-Show account info: plan tier, apps deployed, resource usage.
+Overview of all projects with machine IDs. **Run this first** to understand what's deployed.
+
+```
+Logged in as: user@example.com
+Plan:         pro
+CLI:          20260421-123154
+
+Projects (2):
+
+  my-api
+    URL:     https://my-api.fly.dev
+    Status:  deployed   Region: iad
+    Running (1):
+      e784160df242e8
+    Standby (9):
+      56835429c02568
+      84409ef2319998
+      ...
+
+  my-site
+    URL:     https://my-site.fly.dev
+    Status:  deployed   Region: iad
+    Running (1):
+      d8930e1c063d58
+```
+
+Use machine IDs from this output with `--machine` on exec/console commands.
 
 ---
 
@@ -135,6 +161,9 @@ ifhost deploy [flags]
 
 **After deploy:** Prints the live URL (e.g., `https://my-app.fly.dev`).
 
+**Scaled apps:** Deploy automatically propagates the new image to all machines (rolling update).
+No need to update standby machines manually — they all get the new code.
+
 ---
 
 ### ifhost describe --app \<name\>
@@ -166,7 +195,24 @@ All app-specific commands live under `machines`. Requires `--app <name>` or an `
 ifhost machines --app my-app
 ```
 
-Shows machine IDs, states, regions, and specs.
+Shows machines grouped by state with IDs for targeting:
+
+```
+my-app  (10 machines)
+
+  Running (1)
+  ID               REG  SPEC             NAME
+  e784160df242e8   iad  shared/2 1024MB  fragrant-glade-7429
+
+  Standby (9) — wakes on traffic, $0 while idle
+  ID               REG  SPEC             NAME
+  56835429c02568   iad  shared/2 1024MB  lingering-sky-4328
+  ...
+
+  Tip: ifhost machines exec --machine <id> --app my-app -- <cmd>
+```
+
+For a cross-project overview, use `ifhost status` — lists all projects with machine IDs.
 
 #### Start / Stop / Restart
 
@@ -272,15 +318,22 @@ Works with any log file or process output inside the container.
 
 ### ifhost machines exec
 
-Run a one-off command inside the running container. For commands that finish without stdin.
+Run a one-off command inside a running container. For commands that finish without stdin.
 
 ```bash
 ifhost machines exec --app my-app -- ls /data
 ifhost machines exec --app my-app -- env
-ifhost machines exec --app my-app -- cat /etc/nginx/nginx.conf
+ifhost machines exec --app my-app --machine e784160df242e8 -- cat /var/log/app.log
 ifhost machines exec --app my-app -- python manage.py migrate
-ifhost machines exec --app my-app -- sh -c "du -sh /data/*"
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--machine <id>` | Target a specific machine (default: first running). Get IDs from `ifhost status`. |
+
+**Important for scaled apps:** Without `--machine`, exec picks an arbitrary running machine.
+Use `ifhost status` to get machine IDs, then pass `--machine <id>` to target the right one.
+This matters for volume-mounted apps (each machine has its own disk) and debugging specific instances.
 
 Timeout: 120 seconds. If no machines are running, start the app first.
 
