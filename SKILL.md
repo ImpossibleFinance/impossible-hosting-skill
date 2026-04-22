@@ -928,27 +928,37 @@ ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
 
 The deploy prints `Your app is live at: https://<app-public-hostname>` — use that hostname as `APP_URL` in the toml.
 
-**Prime the webhook immediately (don't wait for OpenClaw's slow internal setWebhook):**
+**Expected wall-clock timings (measured 2026-04-22, pre-built image):**
+- `ifhost deploy` command → `Deployed!` line: **~1 min** (with one 412 retry, see below).
+- `Deployed!` → webhook listener answering on :18789: **~5 min** (OpenClaw gateway + plugin init).
+- Webhook listener up → OpenClaw's internal `setWebhook` call completes: **~10s** after listener.
+- Total `T_deploy_start` → ready-to-receive: **~7-8 min**.
+- First real message: add another **30-60s** for LLM pipeline cold-start; subsequent messages are fast.
 
-After deploy, poll the webhook endpoint until it returns 401 (listener up, rejecting unauthenticated), then call Telegram's `setWebhook` from your laptop to register your URL with Telegram directly. This cuts 3-5 minutes of wait time:
+**412 race on first deploy may fire** — `failed_precondition: unable to start machine from current state: 'created'` is a Fly machine-transition race. ifhost has retry logic for the redeploy path but the fresh-app path isn't fully covered yet, so about half the time the first deploy of a new app hits it. Just retry the same command immediately. The app+volume are already created; the retry skips that step and boots the machine. Don't troubleshoot, don't wait — retry.
+
+**Readiness probe (not a speedup — OpenClaw registers the webhook itself as soon as its listener is up):**
 
 ```bash
 APP_URL=<app-public-hostname>
 TG_WEBHOOK_SECRET=<same-secret-you-deployed-with>
 
-# Wait for webhook listener to come up
+# Wait for webhook listener to come up (~5 min after Deployed!)
 until [ "$(curl -s -o /dev/null -w "%{http_code}" -X POST -d '{}' https://$APP_URL/telegram-webhook)" = "401" ]; do sleep 5; done
 
-# Register the webhook with Telegram
+# At this point OpenClaw has already called setWebhook itself. You can prime it
+# manually as a belt-and-braces check, but it typically returns "Webhook is already set":
 curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
   --data-urlencode "url=https://$APP_URL/telegram-webhook" \
   --data-urlencode "secret_token=$TG_WEBHOOK_SECRET"
 
-# Verify it's registered
+# Verify URL is registered
 curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo" | jq .result.url
 ```
 
-Once the webhook URL is registered, messages from the user arrive in seconds.
+Once `getWebhookInfo` shows the URL, the bot will receive messages — but the FIRST real message cold-starts the LLM pipeline (expect 30-60s lag). Later messages are fast, assuming the upstream handler-timeout fix (see banner above) isn't biting.
+
+**Do not ack-test the webhook handler with fake POSTs from your laptop.** A POST carrying a real `message` payload will trigger the full LLM pipeline, block for 30-60s, and `curl` will appear to hang. This is the known handler-latency issue — not a deploy failure. Validate by asking the user to message the bot via Telegram once `getWebhookInfo` is clean.
 
 **Gotchas:**
 - **Port-swap is mandatory.** Gateway must be on a different internal port (19001) than the webhook listener (18789). They're separate HTTP servers inside OpenClaw and can't share a port.
