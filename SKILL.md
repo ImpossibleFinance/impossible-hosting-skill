@@ -15,7 +15,9 @@ Deploy any Dockerized app to the cloud with one command. Each app gets its own i
 
 **Step A — Read the docs:**
 - README.md, INSTALL.md, docs/install/ folder, or any setup guide
-- docker-compose.yml (shows ports, volumes, env vars, startup commands)
+- **Look for a published Docker image** (ghcr.io, docker.io, quay.io references).
+  If one exists, use `ifhost deploy --image <ref>` — skips the build entirely (~30s).
+- docker-compose.yml (shows ports, volumes, env vars, startup commands, image refs)
 - .env.example (lists ALL required env vars with descriptions)
 - Dockerfile (shows exposed port, build steps, CMD, HEALTHCHECK)
 - Any config file templates (config.example.json, etc.)
@@ -202,12 +204,13 @@ ifhost deploy [flags]
 
 | Flag | Description |
 |------|-------------|
+| `--image <ref>` | **Skip the build entirely.** Deploy a pre-built image (10x faster). Example: `--image ghcr.io/openclaw/openclaw:latest` |
 | `--local` | Force local Docker build (requires Docker Desktop running) |
 | `--remote` | Force remote source upload + cloud build |
 | `--runner` | Deploy a generic shell image (no Dockerfile needed). For interactive setup via console. |
 | `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
 | `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
-| `--cmd "..."` | Override startup command (replaces Dockerfile CMD) |
+| `--cmd "..."` | Override startup command (replaces image's CMD) |
 | `--port N` | Override container port |
 | `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
 | `--storage cloud\|local` | Override storage mode |
@@ -215,10 +218,17 @@ ifhost deploy [flags]
 | `--yes` | Skip confirmation prompts |
 | `--json` | Output structured JSON |
 
-**Build modes (auto-detected):**
-- Local Docker available → builds locally, pushes image (fastest, uses cache)
-- No Docker → uploads source to cloud builder (capped at ~30MB source)
+**Build modes (in order of preference for speed):**
+- `--image <ref>` → No build. Pulls a pre-built image. **~30 seconds total.**
+  Check the project's README for `ghcr.io/...` or `docker.io/...` published images.
+- Local Docker available → builds locally with layer cache. ~30s-2min after first build.
 - `--runner` → boots a generic shell VM, no build needed
+- Otherwise → uploads source to cloud builder (capped at ~30MB). 5-10 min for heavy builds.
+
+**Always check first if the project publishes a Docker image** (look for `ghcr.io`, `docker.io`,
+or `quay.io` references in README or docker-compose.yml). Using `--image` skips the entire
+build step — no source upload, no pnpm install, no compile. Most modern OSS projects publish
+images and this is by far the fastest path.
 
 **During deploy:** Streams real-time build logs via SSE. Press Ctrl+C to cancel.
 
