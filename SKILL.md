@@ -228,7 +228,19 @@ ifhost machines restart --app my-app
 ifhost machines scale 3 --app my-app    # Scale to 3 machines
 ```
 
-Manual scaling only. Machines still auto-start/stop per traffic. For true auto-scaling, use `ifhost machines autoscale set`.
+Standby machines cost $0 — they only wake when traffic arrives (~1-2s cold start).
+Deploys auto-propagate the new image to all machines (rolling update).
+
+**Critical for scaled apps:** Don't use `exec` for post-deploy setup (migrations, config).
+Standby machines won't get exec commands when they wake. Instead, put ALL setup in
+`[build] cmd` in impossible.toml — it runs on every machine boot:
+
+```toml
+[build]
+cmd = "python manage.py migrate && gunicorn app:app"
+```
+
+For true auto-scaling, use `ifhost machines autoscale set`.
 
 #### Auto-scale
 
@@ -565,6 +577,8 @@ Does the project have a Dockerfile?
 | Autostop kills slow apps | App never becomes reachable | `autostop = false` + `min_machines = 1` |
 | Env vars in config files | Values lost on restart | Use `--env` or `[env]` in impossible.toml |
 | Startup needs setup | App crashes on boot | Use `[build] cmd = "migrate && serve"` |
+| Scaled app needs setup | Standby machines wake unconfigured | Put ALL setup in `[build] cmd`, not in exec. cmd runs on every boot. |
+| Console hits wrong machine | Input goes to machine A, session is on B | Always pass `machine_id` from ConsoleStart response to Input/Output |
 | Lock files from crash | App hangs on restart | Prepend `rm -f /tmp/*.lock &&` to cmd |
 | Source too large (>30MB) | Remote build fails/slow | Use `--local` with Docker Desktop, or add .dockerignore |
 | No .dockerignore | Upload takes forever | Create .dockerignore excluding node_modules, .git, etc. |
