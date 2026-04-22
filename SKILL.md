@@ -82,7 +82,9 @@ APP's problem, not the deploy.
 What to do instead:
 1. After deploy completes, hit the health endpoint ONCE to confirm liveness
 2. Tell the user "Deploy succeeded. App is live at https://X. Bot/integration may take
-   another minute to fully connect — try messaging it in ~60s."
+   another 1-3 min to fully connect. Messaging bots (Telegram/Discord) typically
+   take 2-3 min between 'gateway ready' and actually polling — this is the app's
+   startup, not the deploy. Try messaging it in ~3 min."
 3. **Don't set up Monitor tasks waiting for specific log strings unless asked**
 4. If the user reports the integration didn't work, THEN check logs
 
@@ -721,7 +723,31 @@ Key points:
 - Secrets are available as `$ENV_VAR` in `[build] cmd` — use them to generate config files
 - If Dockerfile has no EXPOSE, check docker-compose.yml or app docs for the port
 
+**Put env vars that `[build] cmd` references in `[env]`, not `--env`:** If your `[build] cmd`
+expands `$MY_VAR`, that variable MUST be in the `[env]` block of impossible.toml. Previously
+`--env KEY=VAL` on the deploy command line could be wiped on machine rebuild, leaving your
+`printf` to produce empty values (e.g. `allowFrom: [""]` → validator crash loop). The CLI
+now persists `--env` through deploys, but `[env]` in the toml is still the safest option
+because it's version-controlled and visible.
+
+**Fail loud on missing env vars in `[build] cmd`:** Use bash's `${VAR:?missing}` guard so
+the shell exits if a required variable is empty, instead of silently writing a broken config:
+```toml
+cmd = """printf '{"id":"%s"}' "${CHAT_ID:?CHAT_ID not set}" > /data/config.json && exec ..."""
+```
+
 ### Messaging bot (Telegram, Discord, Slack, etc.)
+
+**Region matters:** Telegram bots MUST NOT deploy to `iad` (US East). Fly's iad region has
+broken IPv6/persistent-connection routing to `api.telegram.org` — `getUpdates` hangs for
+120s+ and `sendMessage` fails with "Network request failed" even though one-shot `curl`
+from the same container works. Use `--region ams` (Amsterdam) or `fra` (Frankfurt) — they're
+colocated with Telegram's DC2/DC4 and work first try.
+
+```bash
+ifhost init --app my-bot --port 3000 --region ams ...   # NOT iad
+ifhost deploy --region ams --image ghcr.io/...
+```
 
 Bots that use long polling or WebSocket connections MUST stay running at all times.
 Autostop will kill the process when there's no HTTP traffic, breaking the bot.
@@ -864,25 +890,30 @@ ifhost init --app my-claw --port 18789 --memory 2048 --cpus 2 --autostop=false -
 Edit `impossible.toml` to add (replace `<TG_USER_ID>` with your numeric Telegram user ID):
 ```toml
 [build]
-cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"]}}}' "$TELEGRAM_CHAT_ID" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 18789 --allow-unconfigured"""
+cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"]}}}' "${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID not set}" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 18789 --allow-unconfigured"""
 
 [env]
 NODE_ENV = "production"
 TELEGRAM_CHAT_ID = "<TG_USER_ID>"
 ```
 
-Deploy:
+Deploy (NOTE: region `ams` — Telegram is broken on `iad`):
 ```bash
-ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
+ifhost deploy --image ghcr.io/openclaw/openclaw:latest --region ams \
   --secret OPENAI_API_KEY=sk-... \
   --secret TELEGRAM_BOT_TOKEN=...
 ```
 
 Gotchas:
+- **Region: use `ams` or `fra` for Telegram, NEVER `iad`** — iad has broken routing to api.telegram.org (getUpdates stalls, sendMessage fails)
 - Port is **18789**, not 8080 or 3000 (check Dockerfile HEALTHCHECK)
 - Config root key is `agents` (plural) — Zod schema overrides docs
 - `--bind lan` activates the Control UI — must set `controlUi.enabled = false` OR set `controlUi.allowedOrigins`
 - Telegram default DM policy needs pairing — use `dmPolicy: "allowlist"` with your numeric user ID to skip pairing
+- Put `TELEGRAM_CHAT_ID` in `[env]` (not `--env` CLI flag) so it survives machine rebuilds
+- Use `${VAR:?missing}` guard so the shell fails loudly if the var is empty
+- After "gateway ready" log appears, Telegram polling starts **2-3 minutes later**, not 60s. Don't panic if bot is silent right after deploy.
+- "Config write anomaly" and "Config overwrite" log lines are NORMAL — OpenClaw rewrites its config on boot to add meta/auth token. Your dmPolicy/allowFrom settings survive.
 
 ---
 
