@@ -893,37 +893,99 @@ Pre-verified configs for popular projects. Saves you discovery time.
 
 ### OpenClaw (Telegram/Discord/Slack AI bot)
 
-```bash
-ifhost init --app my-claw --port 18789 --memory 2048 --cpus 2 --autostop=false --min-machines 1 --storage local
-```
+> **Known upstream issue (as of 2026-04-22):** OpenClaw's Telegram webhook handler calls the LLM synchronously before returning 200 to Telegram, which blows Telegram's webhook read timeout on slow responses. Symptom: `last_error_message: "Read timeout expired"` in `getWebhookInfo`, pending updates pile up, replies lag 1-5 min. This is in OpenClaw's code (grammY's `webhookCallback` is called without `onTimeout: "return"`), not in ifhost. A Cloudflare Worker webhook relay (see "Production reliability" below) fully works around it.
 
-Edit `impossible.toml` to add (replace `<TG_USER_ID>` with your numeric Telegram user ID):
+**Use webhook mode, not long-polling.** Long-lived HTTPS polling connections (which `getUpdates` uses) are unreliable on most cloud/edge infrastructure — they stall every few minutes because edge proxies drop idle TCP. Webhook mode uses short HTTPS calls in both directions and avoids that entire class of failure.
+
+**Port-swap trick:** ifhost's `[service]` block only exposes a single internal port. Run the OpenClaw gateway on an internal-only port (19001) and bind the Telegram webhook listener to the exposed port (18789). Incoming `https://<app-url>/telegram-webhook` requests from Telegram route straight to grammY's webhook handler inside OpenClaw.
+
+**Complete `impossible.toml`:**
+
 ```toml
+app = "my-claw"
+storage = "local"
+region = "ams"
+
+[service]
+internal_port = 18789  # exposed to internet; webhook listener binds here
+autostop = false
+min_machines = 1
+
+[resources]
+cpu_kind = "shared"
+cpus = 2
+memory_mb = 2048
+
 [build]
-cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"]}}}' "${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID not set}" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 18789 --allow-unconfigured"""
+cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"],"webhookUrl":"https://%s/telegram-webhook","webhookSecret":"%s","webhookHost":"0.0.0.0","webhookPort":18789}}}' "${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID not set}" "${APP_URL:?APP_URL not set}" "${TG_WEBHOOK_SECRET:?TG_WEBHOOK_SECRET not set}" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 19001 --allow-unconfigured"""
 
 [env]
 NODE_ENV = "production"
 TELEGRAM_CHAT_ID = "<TG_USER_ID>"
+APP_URL = "<app-public-hostname>"   # the hostname printed by 'ifhost deploy', e.g. my-claw.<ifhost-domain>
+NODE_OPTIONS = "--dns-result-order=ipv4first"
 ```
 
-Deploy (NOTE: region `ams` — Telegram is broken on `iad`):
+**Deploy:**
 ```bash
-ifhost deploy --image ghcr.io/openclaw/openclaw:latest --region ams \
+ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
   --secret OPENAI_API_KEY=sk-... \
-  --secret TELEGRAM_BOT_TOKEN=...
+  --secret TELEGRAM_BOT_TOKEN=... \
+  --secret TG_WEBHOOK_SECRET=$(openssl rand -hex 24) \
+  --yes
 ```
 
-Gotchas:
-- **Region: use `ams` or `fra` for Telegram, NEVER `iad`** — iad has broken routing to api.telegram.org (getUpdates stalls, sendMessage fails)
-- Port is **18789**, not 8080 or 3000 (check Dockerfile HEALTHCHECK)
-- Config root key is `agents` (plural) — Zod schema overrides docs
-- `--bind lan` activates the Control UI — must set `controlUi.enabled = false` OR set `controlUi.allowedOrigins`
-- Telegram default DM policy needs pairing — use `dmPolicy: "allowlist"` with your numeric user ID to skip pairing
-- Put `TELEGRAM_CHAT_ID` in `[env]` (not `--env` CLI flag) so it survives machine rebuilds
-- Use `${VAR:?missing}` guard so the shell fails loudly if the var is empty
-- After "gateway ready" log appears, Telegram polling starts **2-3 minutes later**, not 60s. Don't panic if bot is silent right after deploy.
-- "Config write anomaly" and "Config overwrite" log lines are NORMAL — OpenClaw rewrites its config on boot to add meta/auth token. Your dmPolicy/allowFrom settings survive.
+The deploy prints `Your app is live at: https://<app-public-hostname>` — use that hostname as `APP_URL` in the toml.
+
+**Prime the webhook immediately (don't wait for OpenClaw's slow internal setWebhook):**
+
+After deploy, poll the webhook endpoint until it returns 401 (listener up, rejecting unauthenticated), then call Telegram's `setWebhook` from your laptop to register your URL with Telegram directly. This cuts 3-5 minutes of wait time:
+
+```bash
+APP_URL=<app-public-hostname>
+TG_WEBHOOK_SECRET=<same-secret-you-deployed-with>
+
+# Wait for webhook listener to come up
+until [ "$(curl -s -o /dev/null -w "%{http_code}" -X POST -d '{}' https://$APP_URL/telegram-webhook)" = "401" ]; do sleep 5; done
+
+# Register the webhook with Telegram
+curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  --data-urlencode "url=https://$APP_URL/telegram-webhook" \
+  --data-urlencode "secret_token=$TG_WEBHOOK_SECRET"
+
+# Verify it's registered
+curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo" | jq .result.url
+```
+
+Once the webhook URL is registered, messages from the user arrive in seconds.
+
+**Gotchas:**
+- **Port-swap is mandatory.** Gateway must be on a different internal port (19001) than the webhook listener (18789). They're separate HTTP servers inside OpenClaw and can't share a port.
+- Gateway's `/healthz` won't be reachable on the public URL (it's on internal :19001). That's fine — the default TCP check on 18789 passes because the webhook listener is there. To validate end-to-end health, use `curl .../getWebhookInfo` on Telegram's side instead of hitting `/healthz` directly.
+- Config root key is `agents` (plural) — Zod schema overrides docs.
+- `--bind lan` activates the gateway's HTTP/Control UI — set `controlUi.enabled = false`.
+- `dmPolicy: "allowlist"` + numeric user ID in `allowFrom` skips pairing.
+- Put `TELEGRAM_CHAT_ID` and `APP_URL` in `[env]`, NOT `--env` CLI flag — `--env` doesn't survive machine rebuilds (ifhost limitation).
+- Use `${VAR:?missing}` guards so empty env vars fail loudly instead of writing a broken config.
+- "Config write anomaly" and "Config overwrite" log lines are NORMAL — OpenClaw rewrites its config on boot to add meta/auth token. Your settings survive.
+- `last_error_message: "Read timeout expired"` in `getWebhookInfo` is the signature of the upstream handler-latency issue described at the top of this section, NOT an infra problem. See "Production reliability" below for the fix.
+
+**Production reliability — Cloudflare Worker relay (recommended for any user-facing deploy):**
+
+Because OpenClaw's webhook handler blocks on LLM calls, Telegram's webhook pushes time out and retry, cascading into multi-minute reply lag in the worst case. Put a Cloudflare Worker in front as a relay: the Worker acks 200 to Telegram in <100ms at Cloudflare's edge, then forwards the payload to OpenClaw asynchronously — OpenClaw can take 30s to think and it no longer matters.
+
+1. Point `webhookUrl` in your OpenClaw config at the Worker's URL (e.g. `https://<your-worker>.workers.dev/telegram-webhook`) instead of `<app-public-hostname>`.
+2. Have the Worker forward to `https://<app-public-hostname>/telegram-webhook` with the same secret token header.
+
+Public starting points:
+- [`tuanpb99/cf-worker-telegram`](https://github.com/tuanpb99/cf-worker-telegram) — transparent Bot API proxy on Workers
+- [`cvzi/telegram-bot-cloudflare`](https://github.com/cvzi/telegram-bot-cloudflare) — minimal webhook handler on Workers
+
+Setup is ~15 minutes if you have a Cloudflare account.
+
+**Isolation test (for future debugging):** if you're seeing slow Telegram replies from an ifhost bot and want to rule out the infra, deploy a minimal Python or Node echo bot on the same `impossible.toml` template with webhook mode. A minimal bot does 300-600ms round trips in steady state — if your echo bot is fast and OpenClaw is slow, it's an application-layer problem.
+
+**Why NOT long-polling mode:** `getUpdates` stalls 120s+ every few minutes because cloud edge infrastructure drops long-lived HTTPS connections. Log signature: `[telegram] Polling stall detected (active getUpdates stuck for 122s); forcing restart`. Webhook mode flips the direction — Telegram initiates short HTTPS POSTs to us, and our replies are short outbound HTTPS to `api.telegram.org/sendMessage`. No long-lived connections anywhere.
 
 ---
 
