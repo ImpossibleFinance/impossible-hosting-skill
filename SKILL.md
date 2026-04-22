@@ -24,7 +24,23 @@ Deploy any Dockerized app to the cloud with one command. Each app gets its own i
 
 Only after you understand the full setup should you configure impossible.toml and deploy.
 
-### 2. Read --help for exact syntax
+### 2. Tell the user what's happening
+
+Before starting, outline the steps and estimated time so the user knows what to expect:
+
+```
+Deploying my-app to ifhost:
+  1. Read project docs and Dockerfile        (~10s)
+  2. Configure impossible.toml               (~5s)
+  3. Build and deploy                         (~1-3 min)
+  4. Verify the app is live                   (~10s)
+
+Estimated total: ~2-4 minutes
+```
+
+Update the user at each step. If something takes longer than expected (e.g., build is slow), say so. Never go silent for more than 30 seconds during a deploy.
+
+### 3. Read --help for exact syntax
 
 Before running any ifhost command, check its help text:
 
