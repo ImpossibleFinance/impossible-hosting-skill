@@ -738,26 +738,17 @@ cmd = """printf '{"id":"%s"}' "${CHAT_ID:?CHAT_ID not set}" > /data/config.json 
 
 ### Messaging bot (Telegram, Discord, Slack, etc.)
 
-**Region matters:** Telegram bots MUST NOT deploy to `iad` (US East). The `iad` region has
-broken IPv6/persistent-connection routing to `api.telegram.org` — `getUpdates` hangs for
-120s+ and `sendMessage` fails with "Network request failed" even though one-shot `curl`
-from the same container works. Use `ams` (Amsterdam) or `fra` (Frankfurt) — they're
-colocated with Telegram's DC2/DC4 and work first try.
-
-**CRITICAL: Region locks at app creation time.** Once you create an app in a region,
-subsequent `ifhost deploy --region ...` calls DO NOT move it. The flag only matters on
-the very first deploy (when the app is created). To change region: destroy and recreate.
+**Region locks at app creation time.** Once you create an app in a region, subsequent
+`ifhost deploy --region ...` calls DO NOT move it. The flag only matters on the very
+first deploy (when the app is created). To change region: destroy and recreate.
 
 Set region in impossible.toml BEFORE the first deploy:
 ```toml
 app = "my-bot"
-region = "ams"    # NOT primary_region — the field is just "region"
+region = "iad"    # The toml field is "region", not "primary_region"
 ```
 
-Or on first deploy:
-```bash
-ifhost deploy --region ams --image ghcr.io/...
-```
+Default region is `iad` — fine for most apps. See `ifhost regions` for the full list.
 
 Bots that use long polling or WebSocket connections MUST stay running at all times.
 Autostop will kill the process when there's no HTTP traffic, breaking the bot.
@@ -904,7 +895,7 @@ Pre-verified configs for popular projects. Saves you discovery time.
 ```toml
 app = "my-claw"
 storage = "local"
-region = "ams"
+region = "iad"
 
 [service]
 internal_port = 18789  # exposed to internet; webhook listener binds here
