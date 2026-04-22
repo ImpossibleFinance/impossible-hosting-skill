@@ -68,6 +68,27 @@ Estimated total: ~2-4 minutes
 
 Update the user at each step. If something takes longer than expected (e.g., build is slow), say so. Never go silent for more than 30 seconds during a deploy.
 
+### 2a. STOP polling once /healthz returns 200
+
+**Common time-waster:** agents repeatedly poll `ifhost machines logs` and `Monitor`
+waiting for specific app-internal log strings ("gateway ready", "channel connected",
+"polling started"). This wastes 5-20 minutes per deploy.
+
+**Hard rule:** the deploy is DONE when `curl https://<app>.fly.dev/healthz` returns 200
+(or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
+WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
+APP's problem, not the deploy.
+
+What to do instead:
+1. After deploy completes, hit the health endpoint ONCE to confirm liveness
+2. Tell the user "Deploy succeeded. App is live at https://X. Bot/integration may take
+   another minute to fully connect — try messaging it in ~60s."
+3. **Don't set up Monitor tasks waiting for specific log strings unless asked**
+4. If the user reports the integration didn't work, THEN check logs
+
+Time budget: a deploy task should take **~3-5 minutes total** (init + deploy + verify).
+If you're at 10+ minutes, you're overpolling. Stop, tell the user it's deployed, move on.
+
 ### 3. Read --help for exact syntax
 
 Before running any ifhost command, check its help text:
