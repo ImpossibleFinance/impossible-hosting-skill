@@ -7,17 +7,33 @@ description: Deploy any Dockerized app to Impossible Hosting with one command
 
 Deploy any Dockerized app to the cloud with one command. Each app gets its own isolated VM, HTTPS URL, object storage, and optional auto-scaling.
 
-## Agent Rule: Read --help First
+## Agent Rules
+
+### 1. Understand the project BEFORE deploying
+
+**CRITICAL:** Before running `ifhost init` or `ifhost deploy`, you MUST:
+
+1. Read the project's README, SETUP, or INSTALL docs
+2. Read the Dockerfile (or write one if missing)
+3. Read any config files (.env.example, config.yaml, docker-compose.yml) to find:
+   - What port the app listens on
+   - What environment variables and secrets are required (API keys, DB URLs, tokens)
+   - What setup steps run before the app serves (migrations, config generation, build steps)
+   - What RAM/CPU the app needs (Node.js/Python = 512MB+, AI/ML = 1024MB+)
+4. Ask the user for any missing secrets or credentials — never guess API keys
+
+Only after you understand the full setup should you configure impossible.toml and deploy.
+
+### 2. Read --help for exact syntax
 
 Before running any ifhost command, check its help text:
 
 ```bash
 ifhost deploy --help
 ifhost machines logs --help
-ifhost machines console --help
 ```
 
-The CLI help is always up-to-date and includes examples, flag descriptions, and usage patterns. Use this skill doc for the big picture and decision-making, but trust `--help` for exact syntax and available flags.
+The CLI help is always up-to-date. Use this skill doc for the big picture and decision-making, but trust `--help` for exact syntax and available flags.
 
 ## Install
 
