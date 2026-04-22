@@ -929,13 +929,11 @@ ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
 The deploy prints `Your app is live at: https://<app-public-hostname>` — use that hostname as `APP_URL` in the toml.
 
 **Expected wall-clock timings (measured 2026-04-22, pre-built image):**
-- `ifhost deploy` command → `Deployed!` line: **~1 min** (with one 412 retry, see below).
+- `ifhost deploy` command → `Deployed!` line: **~1 min**.
 - `Deployed!` → webhook listener answering on :18789: **~5 min** (OpenClaw gateway + plugin init).
 - Webhook listener up → OpenClaw's internal `setWebhook` call completes: **~10s** after listener.
-- Total `T_deploy_start` → ready-to-receive: **~7-8 min**.
+- Total `T_deploy_start` → ready-to-receive: **~7 min**.
 - First real message: add another **30-60s** for LLM pipeline cold-start; subsequent messages are fast.
-
-**412 race on first deploy may fire** — `failed_precondition: unable to start machine from current state: 'created'` is a Fly machine-transition race. ifhost has retry logic for the redeploy path but the fresh-app path isn't fully covered yet, so about half the time the first deploy of a new app hits it. Just retry the same command immediately. The app+volume are already created; the retry skips that step and boots the machine. Don't troubleshoot, don't wait — retry.
 
 **Readiness probe (not a speedup — OpenClaw registers the webhook itself as soon as its listener is up):**
 
