@@ -1,3 +1,8 @@
+---
+name: ifhost
+description: Deploy any Dockerized app to Impossible Hosting with one command
+---
+
 # ifhost — Deploy to Impossible Hosting
 
 Deploy any Dockerized app to the cloud with one command. Each app gets its own isolated VM, HTTPS URL, object storage, and optional auto-scaling.
