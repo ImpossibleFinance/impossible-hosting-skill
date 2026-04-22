@@ -52,7 +52,7 @@ Let the user confirm or correct before proceeding.
 
 Only after the user approves should you run `ifhost init` and `ifhost deploy`.
 
-### 2. Tell the user what's happening
+### 2. Tell the user what's happening (observability)
 
 Before starting, outline the steps and estimated time so the user knows what to expect:
 
@@ -66,7 +66,16 @@ Deploying my-app to ifhost:
 Estimated total: ~2-4 minutes
 ```
 
-Update the user at each step. If something takes longer than expected (e.g., build is slow), say so. Never go silent for more than 30 seconds during a deploy.
+Update the user at each step. Never go silent for more than 30 seconds during a deploy.
+
+**Concrete rules for observable progress:**
+
+1. **Announce before running.** "Installing xz-utils…" should appear in chat BEFORE the command fires, not just "Sent 83 bytes". Every non-trivial console/Bash call gets a one-line preamble.
+2. **Stream long commands, don't poll.** For anything expected to run >30s (builds, installers, Chromium downloads, console installs), attach a `Monitor` that emits new output lines as they appear. `tail -1` + sleep 15 is a bug — you'll see one line per minute and miss errors.
+3. **Pipes hide failures.** `cmd | tee file; echo __DONE_$?__` reports the exit of `tee`, not `cmd`. If the installer bails halfway, you get `__DONE_0__` and falsely conclude success. Use `set -o pipefail` in the shell snippet, or check for the expected artifact (`test -x /root/.local/bin/hermes`) instead of trusting `$?`.
+4. **Report in human units.** "Downloading Chromium (~250 MB, 1-2 min)" beats "Sent 163 bytes". Convert bytes to MB, seconds to "min:ss", phases to "Phase 3/5".
+5. **On retry or recovery, narrate.** If you see 412/408 and retry, say "hit transient 412, retrying" — don't silently loop. Users seeing a 2-minute hang with no explanation assume the worst.
+6. **Cold exit 0 ≠ success.** A container that exits code 0 after 30s may have run the wrong command (e.g., interactive CLI exiting on no-TTY). Verify by hitting the app's actual endpoint or reading logs, not by trusting the exit code.
 
 ### 2a. STOP polling once /healthz returns 200
 
