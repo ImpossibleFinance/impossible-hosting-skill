@@ -625,6 +625,53 @@ Key points:
 - Set `memory_mb = 2048` if the build step needs >1GB (Node.js/pnpm installs)
 - Pass secrets via `--secret` on deploy, not in the toml file
 
+### Messaging bot (Telegram, Discord, Slack, etc.)
+
+Bots that use long polling or WebSocket connections MUST stay running at all times.
+Fly's autostop will kill the process when there's no HTTP traffic, breaking the bot.
+
+```toml
+app = "my-bot"
+storage = "local"
+
+[service]
+internal_port = 3000
+autostop = false
+min_machines = 1
+
+[resources]
+cpu_kind = "shared"
+cpus = 2
+memory_mb = 1024
+
+[build]
+cmd = "node server.js --bind lan --port 3000"
+
+[env]
+NODE_ENV = "production"
+```
+
+Deploy with bot tokens as secrets:
+```bash
+ifhost deploy \
+  --secret TELEGRAM_BOT_TOKEN=123456:ABC... \
+  --secret OPENAI_API_KEY=sk-... \
+  --env TELEGRAM_CHAT_ID=623508703
+```
+
+**Key rules for bots:**
+- `autostop = false` + `min_machines = 1` — the bot must NEVER stop
+- Bot tokens go in `--secret`, not `--env` (secrets are encrypted, not shown in logs)
+- Secrets are injected as environment variables into the running process automatically
+- If the app generates a config file on boot, use `[build] cmd` to write it BEFORE starting
+- After deploy, verify with `ifhost machines logs --app <name> --lines 20` — look for
+  channel connection messages, NOT by exec/console probing
+
+**Do NOT debug bots with exec/console.** Instead:
+1. Check logs: `ifhost machines logs --app <name> --lines 50`
+2. Check health: `curl https://<name>.fly.dev/healthz`
+3. If something is wrong, fix the config and redeploy — don't try to patch a running container
+
 ### SQLite app (single machine, persistent disk)
 ```bash
 ifhost init --app my-db-app --port 8080 --memory 512 --storage local
@@ -671,6 +718,9 @@ Does the project have a Dockerfile?
 | Startup needs setup | App crashes on boot | Use `[build] cmd = "migrate && serve"` |
 | Scaled app needs setup | Standby machines wake unconfigured | Put ALL setup in `[build] cmd`, not in exec. cmd runs on every boot. |
 | Console hits wrong machine | Input goes to machine A, session is on B | Always pass `machine_id` from ConsoleStart response to Input/Output |
+| Bot killed by autostop | Telegram/Discord bot stops responding after idle | `autostop = false` + `min_machines = 1` for ANY long-polling service |
+| Secrets not in process env | App can't read API keys at runtime | Secrets ARE injected as env vars. Check with `ifhost machines logs`, not exec |
+| Debugging spiral | Agent spends 20 min exec/console probing | Check logs first. If wrong, fix config and redeploy. Don't patch running containers. |
 | Lock files from crash | App hangs on restart | Prepend `rm -f /tmp/*.lock &&` to cmd |
 | Source too large (>30MB) | Remote build fails/slow | Use `--local` with Docker Desktop, or add .dockerignore |
 | No .dockerignore | Upload takes forever | Create .dockerignore excluding node_modules, .git, etc. |
