@@ -149,10 +149,27 @@ ifhost init --app my-app --port 3000 --memory 512     # Generate impossible.toml
 ifhost deploy                                         # Build + deploy
 ```
 
-## ⚡ FASTEST PATH (always try this first)
+## ⚡ Decide the deploy mode FIRST (biggest factor in total time)
 
-If the project publishes a Docker image (most modern OSS projects do — check
-`ghcr.io/<org>/<repo>` or look for image refs in their README/docker-compose.yml):
+Pick one of three modes based on the app's shape and scaling needs. Getting this right up front saves 5-10× on wall-clock vs defaulting to source builds.
+
+### Mode A — `--runner` (no Dockerfile, install at runtime via console)
+
+**Use for:** single-machine bots, personal agents, projects that need an interactive install (install scripts, CLI config wizards), projects whose upstream Dockerfile is broken/missing/overkill. Anything with `min_machines = 1` and no autoscale.
+
+**Why it wins:** deploy finishes in ~15s (generic shell VM, no build), you drive setup via console, install persists to `/data` volume — machine restarts skip install entirely. Tight feedback loop: iterate on config in the console without rebuild-push-redeploy cycles. Immune to upstream Dockerfile changes.
+
+```bash
+ifhost deploy --runner --secret KEY=VAL --yes
+ifhost machines console start --app <app> -- bash
+# install via curl | bash, configure, launch daemon in detached tmux inside /data
+```
+
+See "Complex app — interactive setup" in Common Deployment Patterns for the full console workflow.
+
+### Mode B — `--image ghcr.io/owner/project:latest` (published Docker image)
+
+**Use for:** projects that publish a Docker image and that you might horizontally scale. `~30 seconds total` since Fly pulls the pre-built image directly. No local Docker required.
 
 ```bash
 ifhost init --app my-app --port <PORT> --memory 1024 --autostop=false --min-machines 1
@@ -161,15 +178,22 @@ ifhost deploy --image ghcr.io/owner/project:latest \
   --env CONFIG_VAR=value
 ```
 
-**~30 seconds total** instead of 5-10 minutes for source builds.
-
-Examples of projects with published images: openclaw (`ghcr.io/openclaw/openclaw:latest`),
-most Node/Python web apps, all official Docker Hub images (nginx, redis, postgres, etc.).
+Examples: openclaw (`ghcr.io/openclaw/openclaw:latest`), most Node/Python web apps, all official Docker Hub images.
 
 **How to check if a project publishes an image:**
 1. Look at the README for `docker pull` commands or `image:` lines in docker-compose.yml
-2. Visit `https://github.com/<owner>/<repo>/pkgs/container/<repo>` (GitHub Container Registry)
-3. Run `gh api /orgs/<owner>/packages?package_type=container 2>/dev/null` to list packages
+2. Visit `https://github.com/<owner>/<repo>/pkgs/container/<repo>`
+3. Run `gh api /orgs/<owner>/packages?package_type=container 2>/dev/null`
+
+### Mode C — build from source (`ifhost deploy` with local or remote Dockerfile)
+
+**Use for:** no published image AND horizontal scaling matters (each new machine will pull the pre-built image, not reinstall). Slowest path (3-10 min for the initial build+push), but cached after first success.
+
+Only pick Mode C when both:
+- No published upstream image (rules out Mode B)
+- You need fast cold-start on autoscaled standbys (rules out Mode A's per-machine install cost)
+
+For a single always-on bot, **Mode A beats Mode C** on every metric that matters to you: first-deploy time, iteration speed, resilience to upstream Dockerfile bugs.
 
 ---
 
