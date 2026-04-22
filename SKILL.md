@@ -179,6 +179,19 @@ ifhost machines console start --app <app> -- bash
 
 See "Complex app — interactive setup" in Common Deployment Patterns for the full console workflow.
 
+**Gotchas that burn tokens on `--runner` (learned the hard way, 2026-04-22):**
+
+- **Front-load apt deps before running the project's install script.** The runner base image is minimal — no `curl`, `tmux`, `xz-utils`, `procps`, or `git` out of the box. Start every runner session with:
+  ```
+  apt-get update && apt-get install -y curl tmux xz-utils procps git ca-certificates
+  ```
+  Discovering each missing tool one failure at a time wastes 30s+ per round trip.
+- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before any `curl | bash`.
+- **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths for binaries in tmux commands, or `bash -lc` to get login-shell PATH.
+- **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10× more tokens than just answering arrow-key prompts.
+- **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
+- **PID files may be JSON, not integers.** Hermes writes `{"pid": 9249, "kind": "hermes-gateway", ...}` to `gateway.pid`. `kill $(cat pidfile)` fails with "arguments must be process or job IDs". Parse with `grep -oE '"pid":\s*[0-9]+' file | grep -oE '[0-9]+'`.
+
 ### Mode B — `--image ghcr.io/owner/project:latest` (published Docker image)
 
 **Use for:** projects that publish a Docker image and that you might horizontally scale. `~30 seconds total` since Fly pulls the pre-built image directly. No local Docker required.
