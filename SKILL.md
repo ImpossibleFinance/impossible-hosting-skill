@@ -68,14 +68,16 @@ Estimated total: ~2-4 minutes
 
 Update the user at each step. Never go silent for more than 30 seconds during a deploy.
 
-**Concrete rules for observable progress:**
+**Concrete rules for observable progress (every rule here came from a real user-confusion moment):**
 
-1. **Announce before running.** "Installing xz-utils…" should appear in chat BEFORE the command fires, not just "Sent 83 bytes". Every non-trivial console/Bash call gets a one-line preamble.
-2. **Stream long commands, don't poll.** For anything expected to run >30s (builds, installers, Chromium downloads, console installs), attach a `Monitor` that emits new output lines as they appear. `tail -1` + sleep 15 is a bug — you'll see one line per minute and miss errors.
-3. **Pipes hide failures.** `cmd | tee file; echo __DONE_$?__` reports the exit of `tee`, not `cmd`. If the installer bails halfway, you get `__DONE_0__` and falsely conclude success. Use `set -o pipefail` in the shell snippet, or check for the expected artifact (`test -x /root/.local/bin/hermes`) instead of trusting `$?`.
-4. **Report in human units.** "Downloading Chromium (~250 MB, 1-2 min)" beats "Sent 163 bytes". Convert bytes to MB, seconds to "min:ss", phases to "Phase 3/5".
-5. **On retry or recovery, narrate.** If you see 412/408 and retry, say "hit transient 412, retrying" — don't silently loop. Users seeing a 2-minute hang with no explanation assume the worst.
-6. **Cold exit 0 ≠ success.** A container that exits code 0 after 30s may have run the wrong command (e.g., interactive CLI exiting on no-TTY). Verify by hitting the app's actual endpoint or reading logs, not by trusting the exit code.
+1. **Heartbeat every 60s max, no exceptions.** If an upstream installer (pip, npm, apt) goes silent for 5+ min (Playwright's Chromium install is the classic example), emit `"[heartbeat +Ns] still running: <last visible line>"` every minute anyway. Users staring at a quiet chat assume you're hung — and they're right to give up at 5 min. A minute-by-minute "still at: Installing Node.js dependencies..." is infinitely better than silence.
+2. **Announce before running.** "Installing xz-utils…" should appear in chat BEFORE the command fires, not just "Sent 83 bytes". Every non-trivial console/Bash call gets a one-line preamble.
+3. **Stream long commands, don't poll-and-check.** For anything expected to run >30s (builds, installers, Chromium downloads, console installs), attach a `Monitor` with a diff-based tail that emits NEW lines as they appear AND a heartbeat when no new lines for 60s. `tail -1` + sleep 15 is a bug — you see one line per minute and miss errors.
+4. **Pipes hide failures.** `cmd | tee file; echo __DONE_$?__` reports the exit of `tee`, not `cmd`. If the installer bails halfway, you get `__DONE_0__` and falsely conclude success. Use `set -o pipefail` in the shell snippet, or check for the expected artifact (`test -x /root/.local/bin/hermes`) instead of trusting `$?`.
+5. **Report in human units.** "Downloading Chromium (~250 MB, 1-2 min)" beats "Sent 163 bytes". Convert bytes to MB, seconds to "min:ss", phases to "Phase 3/5".
+6. **On retry or recovery, narrate.** If you see 412/408 and retry, say "hit transient 412, retrying" — don't silently loop. Users seeing a 2-minute hang with no explanation assume the worst.
+7. **Cold exit 0 ≠ success.** A container that exits code 0 after 30s may have run the wrong command (e.g., interactive CLI exiting on no-TTY). Verify by hitting the app's actual endpoint or reading logs, not by trusting the exit code.
+8. **Name the phase before entering it.** Before starting a multi-minute phase, tell the user: "Phase 4/6: Installing Python deps (2-5 min) — this is the longest part; Playwright downloads a Chromium". When the user knows what to expect, 3 minutes of silence is tolerable. When they don't, 30s is infuriating.
 
 ### 2a. STOP polling once /healthz returns 200
 
