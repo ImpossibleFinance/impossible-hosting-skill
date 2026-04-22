@@ -75,7 +75,7 @@ The CLI help is always up-to-date. Use this skill doc for the big picture and de
 ## Install
 
 ```bash
-curl -fsSL https://impossible-api.fly.dev/install | sh
+curl -fsSL https://impossible-api.impossible.host/install | sh
 ```
 
 This downloads the correct binary for the current OS/architecture (macOS/Linux, amd64/arm64)
@@ -95,19 +95,19 @@ If the install script fails (e.g., no curl, restricted network), manually downlo
 
 ```bash
 # macOS ARM (Apple Silicon)
-curl -fsSL https://impossible-api.fly.dev/dl/ifhost_darwin_arm64.tar.gz | tar xz
+curl -fsSL https://impossible-api.impossible.host/dl/ifhost_darwin_arm64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # macOS Intel
-curl -fsSL https://impossible-api.fly.dev/dl/ifhost_darwin_amd64.tar.gz | tar xz
+curl -fsSL https://impossible-api.impossible.host/dl/ifhost_darwin_amd64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # Linux x86_64
-curl -fsSL https://impossible-api.fly.dev/dl/ifhost_linux_amd64.tar.gz | tar xz
+curl -fsSL https://impossible-api.impossible.host/dl/ifhost_linux_amd64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # Linux ARM64
-curl -fsSL https://impossible-api.fly.dev/dl/ifhost_linux_arm64.tar.gz | tar xz
+curl -fsSL https://impossible-api.impossible.host/dl/ifhost_linux_arm64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 ```
 
@@ -143,7 +143,7 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://my-api.fly.dev
+    URL:     https://my-api.impossible.host
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
@@ -153,7 +153,7 @@ Projects (2):
       ...
 
   my-site
-    URL:     https://my-site.fly.dev
+    URL:     https://my-site.impossible.host
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -173,7 +173,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--app` | (required) | App name → becomes `<name>.fly.dev` |
+| `--app` | (required) | App name → becomes `<name>.impossible.host` |
 | `--port` | from Dockerfile EXPOSE, else 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
@@ -204,7 +204,7 @@ ifhost deploy [flags]
 | `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
 | `--cmd "..."` | Override startup command (replaces Dockerfile CMD) |
 | `--port N` | Override container port |
-| `--region <code>` | Fly.io region (e.g. iad, sin, lhr). See `ifhost regions`. |
+| `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
 | `--storage cloud\|local` | Override storage mode |
 | `--app <name>` | Override app name from toml |
 | `--yes` | Skip confirmation prompts |
@@ -217,7 +217,7 @@ ifhost deploy [flags]
 
 **During deploy:** Streams real-time build logs via SSE. Press Ctrl+C to cancel.
 
-**After deploy:** Prints the live URL (e.g., `https://my-app.fly.dev`).
+**After deploy:** Prints the live URL (e.g., `https://my-app.impossible.host`).
 
 **Scaled apps:** Deploy automatically propagates the new image to all machines (rolling update).
 No need to update standby machines manually — they all get the new code.
@@ -628,7 +628,7 @@ Key points:
 ### Messaging bot (Telegram, Discord, Slack, etc.)
 
 Bots that use long polling or WebSocket connections MUST stay running at all times.
-Fly's autostop will kill the process when there's no HTTP traffic, breaking the bot.
+Autostop will kill the process when there's no HTTP traffic, breaking the bot.
 
 ```toml
 app = "my-bot"
@@ -669,7 +669,7 @@ ifhost deploy \
 
 **Do NOT debug bots with exec/console.** Instead:
 1. Check logs: `ifhost machines logs --app <name> --lines 50`
-2. Check health: `curl https://<name>.fly.dev/healthz`
+2. Check health: `curl https://<name>.impossible.host/healthz`
 3. If something is wrong, fix the config and redeploy — don't try to patch a running container
 
 ### SQLite app (single machine, persistent disk)
