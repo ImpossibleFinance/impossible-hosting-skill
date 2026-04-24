@@ -82,16 +82,31 @@ Only after the user approves should you run `ifhost init` and `ifhost deploy`.
 
 ### 2. Tell the user what's happening (observability)
 
-Before starting, outline the steps and estimated time so the user knows what to expect:
+**HARD RULE: always start any multi-step task with a step list and ETA.** No exceptions,
+no matter how short the task seems. Users looking at a blank chat don't know if you're
+thinking, working, or stuck. The step list is the contract — you'll do these N things,
+it'll take ~X minutes.
+
+Before running ANY ifhost command that takes more than a few seconds, print:
 
 ```
-Deploying my-app to ifhost:
-  1. Read project docs and Dockerfile        (~10s)
-  2. Configure impossible.toml               (~5s)
-  3. Build and deploy                         (~1-3 min)
-  4. Verify the app is live                   (~10s)
+Deploying my-app to ifhost — plan:
+  Step 1/4: Read project docs and Dockerfile        (~10s)
+  Step 2/4: Configure impossible.toml               (~5s)
+  Step 3/4: Build and deploy                        (~2-3 min)   ← longest step
+  Step 4/4: Verify the app is live                  (~10s)
 
-Estimated total: ~2-4 minutes
+Total ETA: ~3-4 minutes
+```
+
+Then announce each step AS you start it: "Step 3/4 — building image (2-3 min)…"
+
+Even for a 2-step task ("install ifhost then login"), say so:
+```
+Setting up ifhost — plan:
+  Step 1/2: Install CLI                            (~15s)
+  Step 2/2: Login via GitHub                       (~30s, browser opens)
+Total: ~45s
 ```
 
 Update the user at each step. Never go silent for more than 30 seconds during a deploy.
