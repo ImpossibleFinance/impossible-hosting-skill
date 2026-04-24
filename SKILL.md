@@ -123,6 +123,26 @@ Update the user at each step. Never go silent for more than 30 seconds during a 
 8. **Name the phase before entering it.** Before starting a multi-minute phase, tell the user: "Phase 4/6: Installing Python deps (2-5 min) — this is the longest part; Playwright downloads a Chromium". When the user knows what to expect, 3 minutes of silence is tolerable. When they don't, 30s is infuriating.
 9. **NEVER tail/cat/dump files that could contain secrets** from a live container back into the chat transcript. `.env`, `config.yaml`, `/etc/*secret*`, anything written via `--secret` or echoed from `env | grep KEY` — all off-limits for buffer-dumping even to "verify the write succeeded". If you MUST verify, grep for the variable name only and echo a boolean (`grep -q '^OPENAI_API_KEY=' .env && echo OK`). Once secrets land in a chat transcript they are compromised — the user has to rotate them. One lapse costs the user real money and time.
 
+### 2b. First-start of an app can take 5-15 minutes — plan for it
+
+A fresh deploy is NOT "ready to serve" the moment `ifhost deploy` returns. Expect, on top of the control-plane deploy (10-60s):
+
+- **Image pull to the VM** (30s-2min, depending on image size + region network)
+- **Volume init / encrypt / format** (5-15s, one-time per volume)
+- **Container entrypoint + app cold start** (highly variable)
+  - Trivial web app (echo bot, static site): **1-5s**
+  - Node/Python web service: **5-30s**
+  - Agent frameworks with plugins (openclaw, hermes, similar): **5-15 min** — they install runtime deps, fetch model pricing, initialize browser/voice/channel subsystems, call out to `api.telegram.org`/`api.openai.com` which can themselves stall. Not a bug; that's their actual startup cost on a cold volume.
+- **First-message cold-start for LLM-backed bots**: add another 30s-5min the very first time a user messages the bot — the agent's identity/memory scaffolding runs on-demand.
+
+Implications for you as the agent driving the deploy:
+
+- A single "HTTP probe failed after 60s" is **not sufficient evidence** to conclude the deploy is broken. Only conclude broken if the logs show crash signatures (`Exec format error`, `max restart count`, `Main child exited with code: 1`, OOM kill, port-mismatch refused-connection that persists >3 min after the app should have started).
+- When the probe comes back "no response yet" for a known-slow stack (anything with "plugin" or "agent" or "gateway" in its name), print a friendly **"still initializing, this can take up to 15 min for <stack>; watch with `ifhost machines logs --app X --follow`"** — not a failure.
+- The new `ifhost deploy` (since commit 3ae9f88) distinguishes "still starting" (exit 0, warn) from "broken" (exit 1, error). Trust its exit code; don't treat every warning as a deploy failure.
+- Ask the user to wait 10-15 min before concluding "the bot doesn't work" on the first message. Subsequent messages are fast.
+- Retry loops inside the app (e.g. openclaw's setWebhook call to Telegram) can compound the wait. A single outbound flake from the host region can reset app init by 30s. That's an app-level issue, not ours — document it, don't treat it as our deploy being broken.
+
 ### 2a. STOP polling once /healthz returns 200
 
 **Common time-waster:** agents repeatedly poll `ifhost machines logs` and `Monitor`
