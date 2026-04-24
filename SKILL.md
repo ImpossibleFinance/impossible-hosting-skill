@@ -46,18 +46,26 @@ Config files:  ___  (does the app need a JSON/YAML config file written before it
    globally unique across the platform)
 
 2. Should I pick the machine specs, or do you want to customize them?
-   Defaults if you let me decide:
+
+   ⚠️  RECOMMENDED: let me decide. I've read the Dockerfile, docker-compose,
+   and docs for this specific project and picked specs that match what it
+   actually needs. Going too low (e.g. 256MB for a Node.js app) causes
+   silent OOM kills, crash loops, or slow boots — the app will deploy
+   "successfully" but not work.
+
+   My proposed specs for this project:
      - RAM: <picked based on app type>
      - CPUs: <picked>
      - Always-on: <yes/no based on bot vs static>
      - Region: iad (US East)
      - Auto-scaling: off (single machine)
-   Type 'go' to accept defaults, or tell me what to change.
+
+   Type 'go' to accept (recommended), or tell me specifically what to change.
 ```
 
 Even if the user said something like "deploy this", still ask. The user may want a specific
-domain name or prefer cheaper/bigger specs than you'd pick. Accepting defaults should be
-a one-word reply ("go", "ok", "yes"), but **always show them the choice.**
+domain name. For specs, nudge them toward accepting your picks — you've actually read the
+project; they haven't. Accepting defaults should be a one-word reply ("go", "ok", "yes").
 
 **Step D — Ask for credentials/missing info:**
 - API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
