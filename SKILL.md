@@ -39,14 +39,34 @@ Config files:  ___  (does the app need a JSON/YAML config file written before it
                      Without it, source upload may exceed the 30MB remote build limit.)
 ```
 
-**Step C — Ask the user for anything missing:**
+**Step C — ALWAYS ask the user these two questions (even if you think you know the answer):**
+
+```
+1. What app name / domain do you want? (becomes <name>.<platform-domain>, must be
+   globally unique across the platform)
+
+2. Should I pick the machine specs, or do you want to customize them?
+   Defaults if you let me decide:
+     - RAM: <picked based on app type>
+     - CPUs: <picked>
+     - Always-on: <yes/no based on bot vs static>
+     - Region: iad (US East)
+     - Auto-scaling: off (single machine)
+   Type 'go' to accept defaults, or tell me what to change.
+```
+
+Even if the user said something like "deploy this", still ask. The user may want a specific
+domain name or prefer cheaper/bigger specs than you'd pick. Accepting defaults should be
+a one-word reply ("go", "ok", "yes"), but **always show them the choice.**
+
+**Step D — Ask for credentials/missing info:**
 - API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
 - Bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.)
 - Database URLs
 - Any credentials you can't find in the docs
 - Model preferences (which AI model to use, if applicable)
 
-**Step D — Present your deployment plan to the user BEFORE running any commands.**
+**Step E — Present the full deployment plan for final approval.**
 Show the impossible.toml you'll generate and the exact deploy command with all flags.
 Let the user confirm or correct before proceeding.
 
