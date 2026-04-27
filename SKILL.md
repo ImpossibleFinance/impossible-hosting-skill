@@ -5,7 +5,7 @@ description: Deploy any Dockerized app to Impossible Hosting with one command
 
 # ifhost — Deploy to Impossible Hosting
 
-Deploy any Dockerized app to the cloud with one command. Each app gets its own isolated VM, HTTPS URL, object storage, and optional auto-scaling.
+Deploy any Dockerized app to the cloud with one command. Each app gets its own isolated VM, HTTPS URL, and optional auto-scaling.
 
 ## Agent Rules
 
@@ -345,7 +345,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 | `--cmd` | Dockerfile CMD | Startup command override |
 | `--autostop` | true | Set `false` for apps that take >60s to boot |
 | `--min-machines` | 0 | Set `1` for no cold starts |
-| `--storage` | cloud | `cloud` (S3 bucket) or `local` (volume at /data) |
+| `--storage` | (empty) | `local` provisions a 3 GB `/data` volume. Pins the app to ONE machine (no auto-scaling). Empty = stateless. |
 
 Generates `impossible.toml` in the current directory. Edit it directly after creation — do not re-run init (it errors if the file exists).
 
@@ -370,7 +370,7 @@ ifhost deploy [flags]
 | `--cmd "..."` | Override startup command (replaces image's CMD) |
 | `--port N` | Override container port |
 | `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
-| `--storage cloud\|local` | Override storage mode |
+| `--storage local` | Provision a /data volume on first deploy. Empty = stateless. |
 | `--app <name>` | Override app name from toml |
 | `--yes` | Skip confirmation prompts |
 | `--json` | Output structured JSON |
@@ -713,7 +713,7 @@ Full example with all fields:
 
 ```toml
 app = "my-app"
-storage = "cloud"                  # "cloud" (S3) or "local" (/data volume)
+storage = "local"                  # "local" (/data volume, single machine) or omit (stateless)
 
 [service]
 internal_port = 3000               # Port app listens on (MUST match app)
@@ -931,14 +931,20 @@ ifhost machines console input --app my-project $SID "git clone ... && npm instal
 ```
 Does the project have a Dockerfile?
 ├── YES → ifhost init + ifhost deploy
-│   ├── Simple web app → --memory 256, default settings
-│   ├── API with DB → --memory 512, pass DB_URL via --env
+│   ├── Simple web app → --memory 256, default settings, no storage
+│   ├── API with managed DB → --memory 512, pass DB_URL via --env, no storage
 │   ├── Heavy/AI app → --memory 1024+, --autostop=false, --min-machines 1
-│   └── SQLite app → --storage local (disables scaling)
+│   └── SQLite/file-cache app → --storage local (PINS to 1 machine, no auto-scale)
 └── NO
     ├── Can you write a Dockerfile? → Write it, then deploy normally
     └── Complex interactive setup? → ifhost deploy --runner + console
 ```
+
+**Storage rule:** apps that need to scale across multiple machines must NOT use
+`storage = "local"` (the volume is region-pinned to one machine). For databases
+or any cross-machine state, use a managed service: Supabase, Neon, Upstash, Turso.
+Object storage (S3 buckets) is no longer auto-provisioned — bring your own
+(Tigris, AWS S3, Cloudflare R2, Backblaze B2) and pass credentials via `--secret`.
 
 ---
 
