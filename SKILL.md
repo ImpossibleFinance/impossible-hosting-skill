@@ -415,8 +415,14 @@ ifhost machines restart --app my-app
 
 #### Scale (manual)
 
+**Scaling is available for image deploys only.** Runner-mode apps and
+volume apps can't scale up — added machines would boot without the
+installed app or data — and the API rejects the request with a clear
+error. Don't retry with different counts; the fix is packaging the app
+as an image.
+
 ```bash
-ifhost machines scale 3 --app my-app    # Scale to 3 machines
+ifhost machines scale 3 --app my-app    # Scale to 3 machines (image deploys)
 ```
 
 Standby machines cost $0 — they only wake when traffic arrives (~1-2s cold start).
@@ -447,6 +453,9 @@ ifhost machines autoscale off --app my-app
 | `--target` | 25 | Concurrent requests per machine before scaling |
 
 Autoscale changes are saved to config; run `ifhost deploy` or `ifhost apply` to push them to running machines.
+
+Autoscale is image-only too: a runner-mode deploy is rejected when
+`autoscale_max > 1`, and volume apps can't autoscale at all.
 
 ---
 
@@ -539,11 +548,11 @@ ifhost machines volumes extend my-data --to 10 --app my-app   # Grow only, canno
 ifhost machines volumes rm my-data --app my-app --yes
 ```
 
-**Volumes are per-machine.** Auto-scaling is rejected for volume apps.
-Manual `machines scale` above 1 warns and requires `--yes`: each new machine
-gets its own EMPTY volume (your app/data are NOT copied), and replica
-volumes are deleted on scale-down. Scale a volume app only for per-machine
-scratch space — never for shared state.
+**Volumes are per-machine.** Volume apps can't scale up (manual or auto) —
+each new machine would get its own EMPTY volume, so the API rejects the
+request with a clear error. Scale-down back to 1 machine is allowed.
+Shared volumes are on the roadmap; for shared state today use a managed
+database.
 
 ### ifhost machines domains
 
@@ -773,12 +782,10 @@ Does the project publish a Docker image?
     └── Complex interactive setup → console session, drive the wizard
 ```
 
-**Storage rule:** apps that need to scale across multiple machines must NOT
-rely on `storage = "local"` for shared state — volumes are per-machine.
-Each machine gets its own independent volume; a machine added by scaling
-starts with an EMPTY volume (nothing is copied), and replica volumes are
-deleted on scale-down. For databases or any cross-machine state, use a
-managed service: Supabase, Neon, Upstash, Turso.
+**Storage rule:** volumes are per-machine, so volume apps can't scale up —
+the API rejects it. Apps that need to scale across multiple machines must
+be image deploys without a volume, and keep state in a managed service:
+Supabase, Neon, Upstash, Turso. Shared volumes are on the roadmap.
 
 ---
 
