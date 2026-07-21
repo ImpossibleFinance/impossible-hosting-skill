@@ -446,7 +446,7 @@ ifhost machines autoscale off --app my-app
 | `--max` | 3 | Maximum machines under load |
 | `--target` | 25 | Concurrent requests per machine before scaling |
 
-Run `ifhost deploy` after changing autoscale settings to apply.
+Autoscale changes are saved to config; run `ifhost deploy` or `ifhost apply` to push them to running machines.
 
 ---
 
