@@ -5,7 +5,7 @@ description: Deploy any app to Impossible Hosting with one command
 
 # ifhost — Deploy to Impossible Hosting
 
-Deploy any app to the cloud with one command. Each app gets its own isolated VM, HTTPS URL, and optional auto-scaling.
+Deploy any app to the cloud with one command. Each app gets its own isolated VM and HTTPS URL.
 
 ## Agent Rules
 
@@ -15,8 +15,6 @@ Deploy any app to the cloud with one command. Each app gets its own isolated VM,
 
 **Step A — Read the docs:**
 - README.md, INSTALL.md, docs/install/ folder, or any setup guide
-- **Look for a published Docker image** (ghcr.io, docker.io, quay.io references).
-  If one exists, use `ifhost deploy --image <ref>` — skips setup entirely (~30s).
 - .env.example (lists ALL required env vars with descriptions)
 - Any config file templates (config.example.json, etc.)
 
@@ -52,7 +50,6 @@ Config files:  ___  (does the app need a JSON/YAML config file written before it
      - CPUs: <picked>
      - Always-on: <yes/no based on bot vs static>
      - Region: iad (US East)
-     - Auto-scaling: off (single machine)
 
    Type 'go' to accept (recommended), or tell me specifically what to change.
 ```
@@ -218,13 +215,14 @@ ifhost init --app my-app --port 3000 --memory 512     # Generate impossible.toml
 ifhost deploy                                         # Deploy
 ```
 
-## Deploy Modes (pick one)
+## How Deploys Work (runner mode)
 
-### Mode A — Runner (default, no image needed)
+Every deploy boots a generic Debian shell VM (the "runner"). You then drive
+setup step-by-step — install dependencies, write config, start the app —
+via `exec`, `write`, `push`, and `console`. There is no image build and no
+stack detection: you run the project's own install steps.
 
-**Use for:** single-machine bots, personal agents, projects that need an interactive install (install scripts, CLI config wizards), projects without a published image. Anything with `min_machines = 1` and no autoscale.
-
-**Why it wins:** deploy finishes in ~15s (generic Debian shell VM, no build), you drive setup via console, install persists to `/data` volume — machine restarts skip install entirely. Tight feedback loop: iterate on config in the console without rebuild cycles. Immune to upstream changes.
+**Why it works this way:** deploy finishes in ~15s (generic Debian shell VM, no build), you drive setup via console, install persists to `/data` volume — machine restarts skip install entirely. Tight feedback loop: iterate on config in the console without rebuild cycles. Immune to upstream changes.
 
 ```bash
 ifhost deploy --secret KEY=VAL --yes
@@ -246,24 +244,6 @@ See "Interactive setup" in Common Deployment Patterns for the full console workf
 - **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10x more tokens than just answering arrow-key prompts.
 - **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
 - **PID files may be JSON, not integers.** Hermes writes `{"pid": 9249, "kind": "hermes-gateway", ...}` to `gateway.pid`. `kill $(cat pidfile)` fails with "arguments must be process or job IDs". Parse with `grep -oE '"pid":\s*[0-9]+' file | grep -oE '[0-9]+'`.
-
-### Mode B — Pre-built image (`--image`)
-
-**Use for:** projects that publish a Docker image and that you might horizontally scale. `~30 seconds total` since the image is pulled directly. No local build required.
-
-```bash
-ifhost init --app my-app --port <PORT> --memory 1024 --autostop=false --min-machines 1
-ifhost deploy --image ghcr.io/owner/project:latest \
-  --secret API_KEY=... \
-  --env CONFIG_VAR=value
-```
-
-Examples: openclaw (`ghcr.io/openclaw/openclaw:latest`), most Node/Python web apps, all official Docker Hub images.
-
-**How to check if a project publishes an image:**
-1. Look at the README for `docker pull` commands or `image:` lines in docker-compose.yml
-2. Visit `https://github.com/<owner>/<repo>/pkgs/container/<repo>`
-3. Run `gh api /orgs/<owner>/packages?package_type=container 2>/dev/null`
 
 ---
 
@@ -298,10 +278,6 @@ Projects (2):
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
-    Standby (9):
-      56835429c02568
-      84409ef2319998
-      ...
 
   my-site
     URL:     https://my-site.host.impossi.build
@@ -348,7 +324,6 @@ ifhost deploy [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--image <ref>` | Deploy a pre-built image (~30s). Example: `--image ghcr.io/openclaw/openclaw:latest` |
 | `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
 | `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
 | `--cmd "..."` | Override startup command |
@@ -359,18 +334,10 @@ ifhost deploy [flags]
 | `--yes` | Skip confirmation prompts |
 | `--json` | Output structured JSON |
 
-**Deploy modes (in order of preference):**
-- `--image <ref>` — Pulls a pre-built image. **~30 seconds total.** Check the project's README for `ghcr.io/...` or `docker.io/...` published images.
-- Default (no flags) — boots a generic Debian runner VM. **~15 seconds.** Drive setup via `exec`/`console` after deploy.
-
-**Always check first if the project publishes a Docker image** (look for `ghcr.io`, `docker.io`,
-or `quay.io` references in README or docker-compose.yml). Using `--image` skips interactive setup
-entirely — the app starts from the image's entrypoint.
+Deploy boots a generic Debian runner VM in **~15 seconds**. Drive setup via
+`exec`/`write`/`console` after deploy.
 
 **After deploy:** Prints the live URL (e.g., `https://my-app.host.impossi.build`).
-
-**Scaled apps:** Deploy automatically propagates the new image to all machines (rolling update).
-No need to update standby machines manually — they all get the new code.
 
 ---
 
@@ -413,49 +380,7 @@ ifhost machines stop --app my-app       # No cost while stopped
 ifhost machines restart --app my-app
 ```
 
-#### Scale (manual)
-
-**Scaling is available for image deploys only.** Runner-mode apps and
-volume apps can't scale up — added machines would boot without the
-installed app or data — and the API rejects the request with a clear
-error. Don't retry with different counts; the fix is packaging the app
-as an image.
-
-```bash
-ifhost machines scale 3 --app my-app    # Scale to 3 machines (image deploys)
-```
-
-Standby machines cost $0 — they only wake when traffic arrives (~1-2s cold start).
-Deploys auto-propagate the new image to all machines (rolling update).
-
-**Critical for scaled apps:** Don't use `exec` for post-deploy setup (migrations, config).
-Standby machines won't get exec commands when they wake. Instead, put ALL setup in
-`[build] cmd` in impossible.toml — it runs on every machine boot:
-
-```toml
-[build]
-cmd = "python manage.py migrate && gunicorn app:app"
-```
-
-For true auto-scaling, use `ifhost machines autoscale set`.
-
-#### Auto-scale
-
-```bash
-ifhost machines autoscale set --min 1 --max 5 --target 25 --app my-app
-ifhost machines autoscale off --app my-app
-```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--min` | 0 | Minimum always-running machines (0 = scale to zero) |
-| `--max` | 3 | Maximum machines under load |
-| `--target` | 25 | Concurrent requests per machine before scaling |
-
-Autoscale changes are saved to config; run `ifhost deploy` or `ifhost apply` to push them to running machines.
-
-Autoscale is image-only too: a runner-mode deploy is rejected when
-`autoscale_max > 1`, and volume apps can't autoscale at all.
+Apps run on a single machine. Multi-machine scaling is on the roadmap.
 
 ---
 
@@ -548,11 +473,8 @@ ifhost machines volumes extend my-data --to 10 --app my-app   # Grow only, canno
 ifhost machines volumes rm my-data --app my-app --yes
 ```
 
-**Volumes are per-machine.** Volume apps can't scale up (manual or auto) —
-each new machine would get its own EMPTY volume, so the API rejects the
-request with a clear error. Scale-down back to 1 machine is allowed.
-Shared volumes are on the roadmap; for shared state today use a managed
-database.
+**Volumes are per-machine** (one machine, one disk). Shared volumes are on
+the roadmap; for shared state today use a managed database.
 
 ### ifhost machines domains
 
@@ -677,15 +599,11 @@ cmd = "migrate && start"           # Startup command (see notes below)
 NODE_ENV = "production"
 DATABASE_URL = "postgres://..."
 
-[autoscale]
-min = 1
-max = 5
-concurrency_target = 25
 ```
 
 **About `[build] cmd`:** Despite its name, this is a RUNTIME startup command, NOT a
-build-time step. It runs via `sh -c "<cmd>"` on every machine boot (including standby
-wakes). Shell features work: pipes, `&&`, `$ENV_VARS`.
+build-time step. It runs via `sh -c "<cmd>"` on every machine boot. Shell
+features work: pipes, `&&`, `$ENV_VARS`.
 
 **Secrets and env vars in `[build] cmd`:** All secrets set via `--secret` and env vars
 from `[env]` are available as environment variables when `[build] cmd` runs.
@@ -706,22 +624,21 @@ ifhost deploy --secret API_KEY=sk-... --secret BOT_TOKEN=123:ABC
 
 ## Common Deployment Patterns
 
-### Static site (nginx)
-```bash
-ifhost init --app my-site --port 80 --memory 256
-ifhost deploy --image nginx:alpine
-```
-
 ### Node.js / Python API
 ```bash
-ifhost init --app my-api --port 3000 --memory 512
-ifhost deploy --image ghcr.io/you/api:latest --env DATABASE_URL=postgres://...
+ifhost init --app my-api --port 3000 --memory 512 --storage local
+ifhost deploy --env DATABASE_URL=postgres://...
+ifhost machines exec --app my-api -- sh -c "apt-get update && apt-get install -y curl git"
+ifhost machines push ./ --to /data/app --app my-api
+ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
+# Start the app via [build] cmd in impossible.toml, or in a detached tmux session
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)
 ```bash
-ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1
-ifhost deploy --image ghcr.io/you/agent:latest --env OPENAI_API_KEY=sk-...
+ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1 --storage local
+ifhost deploy --secret OPENAI_API_KEY=sk-...
+# Then drive the project's own install via exec/console (see Interactive setup)
 ```
 
 ### Messaging bot (Telegram, Discord, Slack, etc.)
@@ -771,21 +688,17 @@ ifhost machines console input --app my-project $SID "git clone ... && npm instal
 ## Agent Decision Tree
 
 ```
-Does the project publish a Docker image?
-├── YES → ifhost deploy --image <ref>
-│   ├── Simple web app → --memory 256, default settings, no storage
-│   ├── API with managed DB → --memory 512, pass DB_URL via --env, no storage
-│   ├── Heavy/AI app → --memory 1024+, --autostop=false, --min-machines 1
-│   └── SQLite/file-cache app → --storage local (volumes are per-machine; keep at 1 machine)
-└── NO → ifhost deploy (runner mode, then console/exec to install)
-    ├── Simple setup → exec a few commands, start the app
-    └── Complex interactive setup → console session, drive the wizard
+ifhost deploy (runner VM), then:
+├── Simple web app        → --memory 256, exec a few install commands, start the app
+├── API with managed DB   → --memory 512, pass DB_URL via --env
+├── Heavy/AI app          → --memory 1024+, --autostop=false, --min-machines 1
+├── SQLite/file-cache app → --storage local (volumes are per-machine)
+└── Complex interactive setup → console session, drive the wizard
 ```
 
-**Storage rule:** volumes are per-machine, so volume apps can't scale up —
-the API rejects it. Apps that need to scale across multiple machines must
-be image deploys without a volume, and keep state in a managed service:
-Supabase, Neon, Upstash, Turso. Shared volumes are on the roadmap.
+**Storage rule:** volumes are per-machine (one machine, one disk). Keep
+shared state in a managed service: Supabase, Neon, Upstash, Turso.
+Shared volumes are on the roadmap.
 
 ---
 
@@ -798,7 +711,6 @@ Supabase, Neon, Upstash, Turso. Shared volumes are on the roadmap.
 | Autostop kills slow apps | App never becomes reachable | `autostop = false` + `min_machines = 1` |
 | Env vars in config files | Values lost on restart | Use `--env` or `[env]` in impossible.toml |
 | Startup needs setup | App crashes on boot | Use `[build] cmd = "migrate && serve"` |
-| Scaled app needs setup | Standby machines wake unconfigured | Put ALL setup in `[build] cmd`, not in exec |
 | Bot killed by autostop | Bot stops responding after idle | `autostop = false` + `min_machines = 1` |
 | Secrets not in process env | App can't read API keys | Secrets ARE injected as env vars. Check logs, not exec |
 | Debugging spiral | Agent spends 20 min probing | Check logs first. Fix config and redeploy. |
@@ -832,62 +744,14 @@ ifhost describe --app my-app --json | jq '.deployments[0]'
 
 ---
 
-## Known Projects Cheat Sheet
-
-### OpenClaw (Telegram/Discord/Slack AI bot)
-
-**Use webhook mode, not long-polling.** Long-lived HTTPS polling connections stall every few minutes because edge proxies drop idle TCP. Webhook mode uses short HTTPS calls in both directions.
-
-**Port-swap trick:** Run the OpenClaw gateway on an internal-only port (19001) and bind the Telegram webhook listener to the exposed port (18789).
-
-**Complete `impossible.toml`:**
-
-```toml
-app = "my-claw"
-storage = "local"
-region = "iad"
-
-[service]
-internal_port = 18789
-autostop = false
-min_machines = 1
-
-[resources]
-cpu_kind = "shared"
-cpus = 2
-memory_mb = 2048
-
-[build]
-cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"],"webhookUrl":"https://%s/telegram-webhook","webhookSecret":"%s","webhookHost":"0.0.0.0","webhookPort":18789}}}' "${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID not set}" "${APP_URL:?APP_URL not set}" "${TG_WEBHOOK_SECRET:?TG_WEBHOOK_SECRET not set}" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 19001 --allow-unconfigured"""
-
-[env]
-NODE_ENV = "production"
-TELEGRAM_CHAT_ID = "<TG_USER_ID>"
-APP_URL = "<app-public-hostname>"
-NODE_OPTIONS = "--dns-result-order=ipv4first"
-```
-
-**Deploy:**
-```bash
-ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
-  --secret OPENAI_API_KEY=sk-... \
-  --secret TELEGRAM_BOT_TOKEN=... \
-  --secret TG_WEBHOOK_SECRET=$(openssl rand -hex 24) \
-  --yes
-```
-
-**Timings:** ~1 min to deploy, ~5 min for gateway init, ~7 min total to ready.
-
----
-
 ## Pricing
 
-| Plan | Price | RAM Pool | Volume Pool | Max Autoscale | Custom Domains |
-|------|-------|----------|-------------|---------------|----------------|
-| Free | $0/mo | 256 MB | 1 GB | 1 | 0 |
-| Hobby | $15/mo | 2 GB | 5 GB | 3 | 3 |
-| Pro | $49/mo | 8 GB | 20 GB | 10 | 10 |
-| Team | $149/mo | 24 GB | 50 GB | 20 | unlimited |
+| Plan | Price | RAM Pool | Volume Pool | Custom Domains |
+|------|-------|----------|-------------|----------------|
+| Free | $0/mo | 256 MB | 1 GB | 0 |
+| Hobby | $15/mo | 2 GB | 5 GB | 3 |
+| Pro | $49/mo | 8 GB | 20 GB | 10 |
+| Team | $149/mo | 24 GB | 50 GB | unlimited |
 
 Upgrade: `ifhost plans subscribe <plan>` (or `ifhost sub subscribe <plan>`)
 
