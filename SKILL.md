@@ -1,0 +1,888 @@
+---
+name: ifhost
+description: Deploy any app to Impossible Hosting with one command
+---
+
+# ifhost — Deploy to Impossible Hosting
+
+Deploy any app to the cloud with one command. Each app gets its own isolated VM, HTTPS URL, and optional auto-scaling.
+
+## Agent Rules
+
+### 1. Understand the project BEFORE deploying
+
+**CRITICAL:** Before running `ifhost init` or `ifhost deploy`, complete this checklist:
+
+**Step A — Read the docs:**
+- README.md, INSTALL.md, docs/install/ folder, or any setup guide
+- **Look for a published Docker image** (ghcr.io, docker.io, quay.io references).
+  If one exists, use `ifhost deploy --image <ref>` — skips setup entirely (~30s).
+- .env.example (lists ALL required env vars with descriptions)
+- Any config file templates (config.example.json, etc.)
+
+**Step B — Fill out this mental checklist:**
+```
+Port:          ___  (check app docs, docker-compose ports, or app --help)
+RAM:           ___  (512MB for small apps, 1024MB+ for Node/Python, 2048MB+ if heavy)
+CPUs:          ___  (1 for simple, 2+ for AI/heavy compute)
+Autostop:      ___  (false for bots, long-polling services, or apps that take >60s to boot)
+Env vars:      ___  (list every KEY=VALUE the app needs)
+Secrets:       ___  (API keys, tokens — ask the user, never guess)
+Startup cmd:   ___  (setup before serving: config generation, migrations, --bind lan)
+Bind address:  ___  (many apps default to localhost — must bind to 0.0.0.0 or use --bind lan)
+Storage:       ___  (does the app write config/data to disk? → storage = "local")
+Config files:  ___  (does the app need a JSON/YAML config file written before it starts?)
+```
+
+**Step C — ALWAYS ask the user these two questions (even if you think you know the answer):**
+
+```
+1. What app name / domain do you want? (becomes <name>.<platform-domain>, must be
+   globally unique across the platform)
+
+2. Should I pick the machine specs, or do you want to customize them?
+
+   RECOMMENDED: let me decide. I've read the docs for this specific project
+   and picked specs that match what it actually needs. Going too low (e.g. 256MB
+   for a Node.js app) causes silent OOM kills, crash loops, or slow boots — the
+   app will deploy "successfully" but not work.
+
+   My proposed specs for this project:
+     - RAM: <picked based on app type>
+     - CPUs: <picked>
+     - Always-on: <yes/no based on bot vs static>
+     - Region: iad (US East)
+     - Auto-scaling: off (single machine)
+
+   Type 'go' to accept (recommended), or tell me specifically what to change.
+```
+
+Even if the user said something like "deploy this", still ask. The user may want a specific
+domain name. For specs, nudge them toward accepting your picks — you've actually read the
+project; they haven't. Accepting defaults should be a one-word reply ("go", "ok", "yes").
+
+**Step D — Ask for credentials/missing info:**
+- API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+- Bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.)
+- Database URLs
+- Any credentials you can't find in the docs
+- Model preferences (which AI model to use, if applicable)
+
+**Step E — Present the full deployment plan for final approval.**
+Show the impossible.toml you'll generate and the exact deploy command with all flags.
+Let the user confirm or correct before proceeding.
+
+Only after the user approves should you run `ifhost init` and `ifhost deploy`.
+
+### 2. Tell the user what's happening (observability)
+
+**HARD RULE: always start any multi-step task with a step list and ETA.** No exceptions,
+no matter how short the task seems. Users looking at a blank chat don't know if you're
+thinking, working, or stuck. The step list is the contract — you'll do these N things,
+it'll take ~X minutes.
+
+Before running ANY ifhost command that takes more than a few seconds, print:
+
+```
+Deploying my-app to ifhost — plan:
+  Step 1/4: Read project docs                          (~10s)
+  Step 2/4: Configure impossible.toml                  (~5s)
+  Step 3/4: Deploy                                     (~1-2 min)
+  Step 4/4: Verify the app is live                     (~10s)
+
+Total ETA: ~2-3 minutes
+```
+
+Then announce each step AS you start it: "Step 3/4 — deploying (1-2 min)…"
+
+Even for a 2-step task ("install ifhost then login"), say so:
+```
+Setting up ifhost — plan:
+  Step 1/2: Install CLI                            (~15s)
+  Step 2/2: Login via Google                       (~30s, browser opens)
+Total: ~45s
+```
+
+Update the user at each step. Never go silent for more than 30 seconds during a deploy.
+
+**Concrete rules for observable progress (every rule here came from a real user-confusion moment):**
+
+1. **Heartbeat every 60s max, no exceptions.** If an upstream installer (pip, npm, apt) goes silent for 5+ min (Playwright's Chromium install is the classic example), emit `"[heartbeat +Ns] still running: <last visible line>"` every minute anyway. Users staring at a quiet chat assume you're hung — and they're right to give up at 5 min. A minute-by-minute "still at: Installing Node.js dependencies..." is infinitely better than silence.
+2. **Announce before running.** "Installing xz-utils…" should appear in chat BEFORE the command fires, not just "Sent 83 bytes". Every non-trivial console/Bash call gets a one-line preamble.
+3. **Stream long commands, don't poll-and-check.** For anything expected to run >30s (installers, Chromium downloads, console installs), attach a `Monitor` with a diff-based tail that emits NEW lines as they appear AND a heartbeat when no new lines for 60s. `tail -1` + sleep 15 is a bug — you see one line per minute and miss errors.
+4. **Pipes hide failures.** `cmd | tee file; echo __DONE_$?__` reports the exit of `tee`, not `cmd`. If the installer bails halfway, you get `__DONE_0__` and falsely conclude success. Use `set -o pipefail` in the shell snippet, or check for the expected artifact (`test -x /root/.local/bin/hermes`) instead of trusting `$?`.
+5. **Report in human units.** "Downloading Chromium (~250 MB, 1-2 min)" beats "Sent 163 bytes". Convert bytes to MB, seconds to "min:ss", phases to "Phase 3/5".
+6. **On retry or recovery, narrate.** If you see 412/408 and retry, say "hit transient 412, retrying" — don't silently loop. Users seeing a 2-minute hang with no explanation assume the worst.
+7. **Cold exit 0 ≠ success.** A container that exits code 0 after 30s may have run the wrong command (e.g., interactive CLI exiting on no-TTY). Verify by hitting the app's actual endpoint or reading logs, not by trusting the exit code.
+8. **Name the phase before entering it.** Before starting a multi-minute phase, tell the user: "Phase 4/6: Installing Python deps (2-5 min) — this is the longest part; Playwright downloads a Chromium". When the user knows what to expect, 3 minutes of silence is tolerable. When they don't, 30s is infuriating.
+9. **NEVER tail/cat/dump files that could contain secrets** from a live container back into the chat transcript. `.env`, `config.yaml`, `/etc/*secret*`, anything written via `--secret` or echoed from `env | grep KEY` — all off-limits for buffer-dumping even to "verify the write succeeded". If you MUST verify, grep for the variable name only and echo a boolean (`grep -q '^OPENAI_API_KEY=' .env && echo OK`). Once secrets land in a chat transcript they are compromised — the user has to rotate them. One lapse costs the user real money and time.
+
+### 2b. First-start of an app can take 5-15 minutes — plan for it
+
+A fresh deploy is NOT "ready to serve" the moment `ifhost deploy` returns. Expect, on top of the control-plane deploy (10-60s):
+
+- **Image pull to the VM** (30s-2min, depending on image size + region network)
+- **Volume init / encrypt / format** (5-15s, one-time per volume)
+- **App cold start** (highly variable)
+  - Trivial web app (echo bot, static site): **1-5s**
+  - Node/Python web service: **5-30s**
+  - Agent frameworks with plugins (openclaw, hermes, similar): **5-15 min** — they install runtime deps, fetch model pricing, initialize browser/voice/channel subsystems, call out to `api.telegram.org`/`api.openai.com` which can themselves stall. Not a bug; that's their actual startup cost on a cold volume.
+- **First-message cold-start for LLM-backed bots**: add another 30s-5min the very first time a user messages the bot — the agent's identity/memory scaffolding runs on-demand.
+
+Implications for you as the agent driving the deploy:
+
+- A single "HTTP probe failed after 60s" is **not sufficient evidence** to conclude the deploy is broken. Only conclude broken if the logs show crash signatures (`Exec format error`, `max restart count`, `Main child exited with code: 1`, OOM kill, port-mismatch refused-connection that persists >3 min after the app should have started).
+- When the probe comes back "no response yet" for a known-slow stack (anything with "plugin" or "agent" or "gateway" in its name), print a friendly **"still initializing, this can take up to 15 min for <stack>; watch with `ifhost machines logs --app X --follow`"** — not a failure.
+- The `ifhost deploy` command distinguishes "still starting" (exit 0, warn) from "broken" (exit 1, error). Trust its exit code; don't treat every warning as a deploy failure.
+- Ask the user to wait 10-15 min before concluding "the bot doesn't work" on the first message. Subsequent messages are fast.
+- Retry loops inside the app (e.g. openclaw's setWebhook call to Telegram) can compound the wait. A single outbound flake from the host region can reset app init by 30s. That's an app-level issue, not ours — document it, don't treat it as our deploy being broken.
+
+### 2a. STOP polling once /healthz returns 200
+
+**Common time-waster:** agents repeatedly poll `ifhost machines logs` and `Monitor`
+waiting for specific app-internal log strings ("gateway ready", "channel connected",
+"polling started"). This wastes 5-20 minutes per deploy.
+
+**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossi.build/healthz` returns 200
+(or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
+WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
+APP's problem, not the deploy.
+
+What to do instead:
+1. After deploy completes, hit the health endpoint ONCE to confirm liveness
+2. Tell the user "Deploy succeeded. App is live at https://X. Bot/integration may take
+   another 1-3 min to fully connect. Messaging bots (Telegram/Discord) typically
+   take 2-3 min between 'gateway ready' and actually polling — this is the app's
+   startup, not the deploy. Try messaging it in ~3 min."
+3. **Don't set up Monitor tasks waiting for specific log strings unless asked**
+4. If the user reports the integration didn't work, THEN check logs
+
+Time budget: a deploy task should take **~3-5 minutes total** (init + deploy + verify).
+If you're at 10+ minutes, you're overpolling. Stop, tell the user it's deployed, move on.
+
+### 3. Read --help for exact syntax
+
+Before running any ifhost command, check its help text:
+
+```bash
+ifhost deploy --help
+ifhost machines logs --help
+```
+
+The CLI help is always up-to-date. Use this skill doc for the big picture and decision-making, but trust `--help` for exact syntax and available flags.
+
+## Install
+
+```bash
+curl -fsSL https://host.impossi.build/install | sh
+```
+
+This downloads the correct binary for the current OS/architecture (macOS/Linux, amd64/arm64)
+and installs it to `~/.local/bin/ifhost`. If `~/.local/bin` is not in PATH, add it:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Verify installation:
+
+```bash
+ifhost --help
+```
+
+If the install script fails (e.g., no curl, restricted network), manually download:
+
+```bash
+# macOS ARM (Apple Silicon)
+curl -fsSL https://host.impossi.build/dl/ifhost_darwin_arm64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# macOS Intel
+curl -fsSL https://host.impossi.build/dl/ifhost_darwin_amd64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# Linux x86_64
+curl -fsSL https://host.impossi.build/dl/ifhost_linux_amd64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+
+# Linux ARM64
+curl -fsSL https://host.impossi.build/dl/ifhost_linux_arm64.tar.gz | tar xz
+mv ifhost ~/.local/bin/
+```
+
+## Quick Start
+
+```bash
+ifhost login                                          # Google OAuth (one-time)
+ifhost init --app my-app --port 3000 --memory 512     # Generate impossible.toml
+ifhost deploy                                         # Deploy
+```
+
+## Deploy Modes (pick one)
+
+### Mode A — Runner (default, no image needed)
+
+**Use for:** single-machine bots, personal agents, projects that need an interactive install (install scripts, CLI config wizards), projects without a published image. Anything with `min_machines = 1` and no autoscale.
+
+**Why it wins:** deploy finishes in ~15s (generic Debian shell VM, no build), you drive setup via console, install persists to `/data` volume — machine restarts skip install entirely. Tight feedback loop: iterate on config in the console without rebuild cycles. Immune to upstream changes.
+
+```bash
+ifhost deploy --secret KEY=VAL --yes
+ifhost machines console start --app <app> -- bash
+# install via curl | bash, configure, launch daemon in detached tmux inside /data
+```
+
+See "Interactive setup" in Common Deployment Patterns for the full console workflow.
+
+**Gotchas that burn tokens on runner deploys (learned the hard way):**
+
+- **Front-load apt deps before running the project's install script.** The runner base image is minimal — only `tmux` and `ca-certificates` are preinstalled; no `curl`, `xz-utils`, `procps`, or `git` out of the box. Start every runner session with:
+  ```
+  apt-get update && apt-get install -y curl xz-utils procps git
+  ```
+  Discovering each missing tool one failure at a time wastes 30s+ per round trip.
+- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before any `curl | bash`.
+- **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths for binaries in tmux commands, or `bash -lc` to get login-shell PATH.
+- **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10x more tokens than just answering arrow-key prompts.
+- **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
+- **PID files may be JSON, not integers.** Hermes writes `{"pid": 9249, "kind": "hermes-gateway", ...}` to `gateway.pid`. `kill $(cat pidfile)` fails with "arguments must be process or job IDs". Parse with `grep -oE '"pid":\s*[0-9]+' file | grep -oE '[0-9]+'`.
+
+### Mode B — Pre-built image (`--image`)
+
+**Use for:** projects that publish a Docker image and that you might horizontally scale. `~30 seconds total` since the image is pulled directly. No local build required.
+
+```bash
+ifhost init --app my-app --port <PORT> --memory 1024 --autostop=false --min-machines 1
+ifhost deploy --image ghcr.io/owner/project:latest \
+  --secret API_KEY=... \
+  --env CONFIG_VAR=value
+```
+
+Examples: openclaw (`ghcr.io/openclaw/openclaw:latest`), most Node/Python web apps, all official Docker Hub images.
+
+**How to check if a project publishes an image:**
+1. Look at the README for `docker pull` commands or `image:` lines in docker-compose.yml
+2. Visit `https://github.com/<owner>/<repo>/pkgs/container/<repo>`
+3. Run `gh api /orgs/<owner>/packages?package_type=container 2>/dev/null`
+
+---
+
+## Command Reference
+
+### ifhost login
+
+Authenticate via Google OAuth. Opens a browser (PKCE flow). Credentials are stored at `~/.impossible/credentials.json`. If already logged in, skips the flow.
+
+| Flag | Description |
+|------|-------------|
+| `--token <token>` | Use an API token directly (for CI/agent use — no browser needed) |
+| `--switch` | Switch between existing accounts |
+
+### ifhost logout
+
+Remove stored credentials.
+
+### ifhost status
+
+Overview of all projects with machine IDs. **Run this first** to understand what's deployed.
+
+```
+Logged in as: user@example.com
+Plan:         pro
+CLI:          20260421-123154
+
+Projects (2):
+
+  my-api
+    URL:     https://my-api.host.impossi.build
+    Status:  deployed   Region: iad
+    Running (1):
+      e784160df242e8
+    Standby (9):
+      56835429c02568
+      84409ef2319998
+      ...
+
+  my-site
+    URL:     https://my-site.host.impossi.build
+    Status:  deployed   Region: iad
+    Running (1):
+      d8930e1c063d58
+```
+
+Use machine IDs from this output with `--machine` on exec/console commands.
+
+---
+
+### ifhost init
+
+Generate `impossible.toml` — required before `ifhost deploy`.
+
+```bash
+ifhost init --app <name> --port <port> --memory <mb> [flags]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--app` | (required) | App name — becomes `<name>.host.impossi.build` |
+| `--port` | 8080 | Port the app listens on |
+| `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
+| `--cpus` | 1 | CPU count (1, 2, 4, 8) |
+| `--cpu-kind` | shared | `shared` or `performance` |
+| `--cmd` | (none) | Startup command |
+| `--autostop` | true | Set `false` for apps that take >60s to boot |
+| `--min-machines` | 0 | Set `1` for no cold starts |
+| `--storage` | (empty) | `local` provisions a 1 GB `/data` volume (grow later with `volumes extend`). Pins the app to ONE machine (no auto-scaling). Empty = stateless. |
+
+Generates `impossible.toml` in the current directory. Edit it directly after creation — do not re-run init (it errors if the file exists).
+
+---
+
+### ifhost deploy
+
+Deploy the app. Requires `impossible.toml`.
+
+```bash
+ifhost deploy [flags]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--image <ref>` | Deploy a pre-built image (~30s). Example: `--image ghcr.io/openclaw/openclaw:latest` |
+| `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
+| `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
+| `--cmd "..."` | Override startup command |
+| `--port N` | Override container port |
+| `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
+| `--storage local` | Provision a /data volume on first deploy. Empty = stateless. |
+| `--app <name>` | Override app name from toml |
+| `--yes` | Skip confirmation prompts |
+| `--json` | Output structured JSON |
+
+**Deploy modes (in order of preference):**
+- `--image <ref>` — Pulls a pre-built image. **~30 seconds total.** Check the project's README for `ghcr.io/...` or `docker.io/...` published images.
+- Default (no flags) — boots a generic Debian runner VM. **~15 seconds.** Drive setup via `exec`/`console` after deploy.
+
+**Always check first if the project publishes a Docker image** (look for `ghcr.io`, `docker.io`,
+or `quay.io` references in README or docker-compose.yml). Using `--image` skips interactive setup
+entirely — the app starts from the image's entrypoint.
+
+**After deploy:** Prints the live URL (e.g., `https://my-app.host.impossi.build`).
+
+**Scaled apps:** Deploy automatically propagates the new image to all machines (rolling update).
+No need to update standby machines manually — they all get the new code.
+
+---
+
+### ifhost describe --app \<name\>
+
+Full app context in one call. Aggregates: app status, machines, env vars, secrets, domains, and recent deploys.
+
+```bash
+ifhost describe --app my-app         # Human-readable summary
+ifhost describe --app my-app --json  # Structured JSON (for programmatic use)
+```
+
+Output includes:
+- URL, status, region
+- Machine IDs, states, specs
+- Environment variables (values truncated at 30 chars)
+- Secret key names (values hidden)
+- Custom domains with TLS status
+- Last 5 deployments with status and timestamps
+
+---
+
+### ifhost machines
+
+All app-specific commands live under `machines`. Requires `--app <name>` or an `impossible.toml` in the current directory.
+
+#### List machines
+
+```bash
+ifhost machines --app my-app
+```
+
+Shows machines grouped by state with IDs for targeting.
+
+#### Start / Stop / Restart
+
+```bash
+ifhost machines start --app my-app
+ifhost machines stop --app my-app       # No cost while stopped
+ifhost machines restart --app my-app
+```
+
+#### Scale (manual)
+
+```bash
+ifhost machines scale 3 --app my-app    # Scale to 3 machines
+```
+
+Standby machines cost $0 — they only wake when traffic arrives (~1-2s cold start).
+Deploys auto-propagate the new image to all machines (rolling update).
+
+**Critical for scaled apps:** Don't use `exec` for post-deploy setup (migrations, config).
+Standby machines won't get exec commands when they wake. Instead, put ALL setup in
+`[build] cmd` in impossible.toml — it runs on every machine boot:
+
+```toml
+[build]
+cmd = "python manage.py migrate && gunicorn app:app"
+```
+
+For true auto-scaling, use `ifhost machines autoscale set`.
+
+#### Auto-scale
+
+```bash
+ifhost machines autoscale set --min 1 --max 5 --target 25 --app my-app
+ifhost machines autoscale off --app my-app
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--min` | 0 | Minimum always-running machines (0 = scale to zero) |
+| `--max` | 3 | Maximum machines under load |
+| `--target` | 25 | Concurrent requests per machine before scaling |
+
+Run `ifhost deploy` after changing autoscale settings to apply.
+
+---
+
+### ifhost machines logs
+
+Stream or tail runtime logs from your app. **Default mode is live streaming (tail -f)** — runs indefinitely until Ctrl+C.
+
+```bash
+ifhost machines logs --app my-app                      # Live stream (tail -f)
+ifhost machines logs --app my-app --since 1h           # Last hour, then exit
+ifhost machines logs --app my-app --lines 20           # Last 20 lines, then exit
+ifhost machines logs --app my-app --grep "ERROR"       # Only lines containing ERROR
+ifhost machines logs --app my-app --level error        # Only error/fatal/panic lines
+ifhost machines logs --app my-app --json               # Structured JSON per line
+```
+
+| Flag | Description |
+|------|-------------|
+| `--since <duration>` | Show logs from this duration ago (e.g., 1h, 30m). Exits after. |
+| `--lines <N>` | Show last N lines then exit (no follow) |
+| `--grep "<pattern>"` | Filter: only show lines containing this substring (case-insensitive) |
+| `--level <level>` | Filter by level: `error` (includes fatal/panic), `warn`, `info` |
+| `--json` | Output structured JSON per line |
+| `--raw` | Alias for `--json` |
+| `--wait-for-match <str>` | Exit 0 when a line contains this substring (case-insensitive) |
+| `--wait-timeout <dur>` | Timeout for `--wait-for-match` (default 5m, e.g. 60s, 2m) |
+
+---
+
+### ifhost machines exec
+
+Run a one-off command inside a running machine. For commands that finish without stdin.
+
+```bash
+ifhost machines exec --app my-app -- ls /data
+ifhost machines exec --app my-app -- env
+ifhost machines exec --app my-app --machine e784160df242e8 -- cat /var/log/app.log
+```
+
+Timeout: 10 minutes (enforced server-side, cannot be raised). For longer-running
+commands use the fire-and-poll pattern — launch via `nohup ... &` in one exec, then
+poll completion in later execs — or use `console`. Use `console` for anything
+interactive (prompts, wizards, REPLs).
+
+---
+
+### ifhost machines console
+
+Interactive tmux-backed console for commands that need stdin or take a long time.
+
+#### Start a session
+
+```bash
+ifhost machines console start --app my-app -- bash
+```
+
+Returns a `session-id` (e.g., `ifhost-01abc`).
+
+#### Send input / Read output / End session
+
+```bash
+ifhost machines console input --app my-app <session-id> "npm install"
+ifhost machines console input --app my-app <session-id> --key Enter
+ifhost machines console output --app my-app <session-id> --lines 100
+ifhost machines console end --app my-app <session-id>
+```
+
+---
+
+### ifhost machines env / secrets
+
+**Important:** `env set` and `secrets set` do NOT restart the machine by default. Pass `--restart` to apply immediately, or run `ifhost machines restart` afterward.
+
+```bash
+ifhost machines env set KEY=VALUE --app my-app              # Set (no restart)
+ifhost machines env set KEY=VALUE --restart --app my-app    # Set + restart immediately
+ifhost machines env list --app my-app
+ifhost machines env rm KEY --app my-app                     # Remove env var
+ifhost machines secrets set API_KEY=sk-... --app my-app
+ifhost machines secrets list --app my-app                   # Shows key names only
+ifhost machines secrets rm KEY --app my-app                 # Remove secret
+```
+
+### ifhost machines volumes
+
+```bash
+ifhost machines volumes list --app my-app
+ifhost machines volumes create my-data --size 3 --mount /data --app my-app
+ifhost machines volumes extend my-data --to 10 --app my-app   # Grow only, cannot shrink
+ifhost machines volumes rm my-data --app my-app --yes
+```
+
+Volume apps are pinned to one machine (no horizontal scaling).
+
+### ifhost machines domains
+
+```bash
+ifhost machines domains add myapp.com --app my-app      # Returns CNAME target
+ifhost machines domains list --app my-app
+ifhost machines domains rm myapp.com --app my-app       # Remove custom domain
+```
+
+After adding, create a DNS CNAME record pointing to the returned target. TLS is automatic.
+
+### ifhost machines write / push
+
+```bash
+ifhost machines write <local-file> --to <remote-path> --app my-app                  # Write a single file
+ifhost machines write <local-file> --to <remote-path> --machine <id> --app my-app   # Target specific machine
+ifhost machines push <local-dir> --to <remote-dir> --app my-app                     # Push a directory tree
+```
+
+### ifhost machines wait-for
+
+Block until a substring appears in a file inside the VM. Useful for waiting on app readiness.
+
+```bash
+ifhost machines wait-for --file /var/log/app.log --match "listening on" --app my-app
+ifhost machines wait-for --file /data/startup.log --match "ready" --timeout 2m --app my-app
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--file` | (required) | Absolute path inside the VM to tail |
+| `--match` | (required) | Substring to wait for |
+| `--timeout` | 5m | Timeout (e.g. 60s, 2m) |
+
+### ifhost machines destroy
+
+```bash
+ifhost machines destroy --app my-app --yes              # Delete entire app + resources
+ifhost machines destroy <machine-id> --app my-app       # Delete single machine
+```
+
+### ifhost apply
+
+Push current config (memory, cpus, env, secrets, services) to existing machines without redeploying.
+
+```bash
+ifhost apply --app my-app
+```
+
+### ifhost tokens
+
+```bash
+ifhost tokens create --name "ci-bot"     # Create a new API token (default name: "cli")
+ifhost tokens list                       # List all API tokens
+ifhost tokens revoke <token-id>          # Revoke a token
+```
+
+Use tokens for CI pipelines or agent auth: `ifhost login --token <token>`.
+
+### ifhost auth
+
+```bash
+ifhost auth bind-wallet <address>        # Bind an EVM wallet for USDC top-ups (polls for verification)
+ifhost auth wallets                      # List bound wallets (pending + verified)
+ifhost auth unbind-wallet <address>      # Remove a wallet binding
+```
+
+### ifhost regions
+
+List available deployment regions.
+
+### ifhost version / update
+
+```bash
+ifhost version                           # Show CLI version and check for updates
+ifhost update                            # Update CLI to the latest version
+```
+
+### ifhost plans (aliases: sub, subscription)
+
+```bash
+ifhost plans status                       # Current subscription status
+ifhost plans subscribe hobby              # Subscribe to a plan (hobby, pro, team)
+ifhost plans subscribe --plan pro --pay crypto   # Specify payment method
+ifhost plans cancel                       # Cancel subscription
+ifhost plans invoices                     # Billing history
+```
+
+### ifhost billing
+
+```bash
+ifhost billing plan                 # Show current plan and usage
+ifhost billing alert set --max 20   # Set spend alert at $20
+ifhost billing alert show           # Show current alert
+ifhost billing alert off            # Disable spend alert
+```
+
+---
+
+## impossible.toml Reference
+
+Full example with all fields:
+
+```toml
+app = "my-app"
+storage = "local"                  # "local" (/data volume, single machine) or omit (stateless)
+
+[service]
+internal_port = 3000               # Port app listens on (MUST match app)
+autostop = false                   # false for bots / slow-booting apps
+min_machines = 1                   # 1 = no cold starts
+
+[resources]
+cpu_kind = "shared"                # "shared" or "performance"
+cpus = 2                           # 1, 2, 4, 8
+memory_mb = 1024                   # 256, 512, 1024, 2048, 4096
+
+[build]
+cmd = "migrate && start"           # Startup command (see notes below)
+
+[env]
+NODE_ENV = "production"
+DATABASE_URL = "postgres://..."
+
+[autoscale]
+min = 1
+max = 5
+concurrency_target = 25
+```
+
+**About `[build] cmd`:** Despite its name, this is a RUNTIME startup command, NOT a
+build-time step. It runs via `sh -c "<cmd>"` on every machine boot (including standby
+wakes). Shell features work: pipes, `&&`, `$ENV_VARS`.
+
+**Secrets and env vars in `[build] cmd`:** All secrets set via `--secret` and env vars
+from `[env]` are available as environment variables when `[build] cmd` runs.
+
+**Apps that need a config file at boot:** Use `[build] cmd` to generate it from env vars:
+
+```toml
+[build]
+cmd = """mkdir -p /data && printf '{"token":"%s","model":"%s"}' "$BOT_TOKEN" "$MODEL" > /data/config.json && exec node server.js"""
+```
+
+**Secrets:** Pass via `--secret` on the deploy command, NOT in the toml file:
+```bash
+ifhost deploy --secret API_KEY=sk-... --secret BOT_TOKEN=123:ABC
+```
+
+---
+
+## Common Deployment Patterns
+
+### Static site (nginx)
+```bash
+ifhost init --app my-site --port 80 --memory 256
+ifhost deploy --image nginx:alpine
+```
+
+### Node.js / Python API
+```bash
+ifhost init --app my-api --port 3000 --memory 512
+ifhost deploy --image ghcr.io/you/api:latest --env DATABASE_URL=postgres://...
+```
+
+### Heavy app (AI agent, ML model, slow boot)
+```bash
+ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1
+ifhost deploy --image ghcr.io/you/agent:latest --env OPENAI_API_KEY=sk-...
+```
+
+### Messaging bot (Telegram, Discord, Slack, etc.)
+
+Bots that use long polling or WebSocket connections MUST stay running at all times.
+
+```toml
+app = "my-bot"
+storage = "local"
+
+[service]
+internal_port = 3000
+autostop = false
+min_machines = 1
+
+[resources]
+cpu_kind = "shared"
+cpus = 2
+memory_mb = 1024
+
+[build]
+cmd = "node server.js --bind lan --port 3000"
+
+[env]
+NODE_ENV = "production"
+```
+
+```bash
+ifhost deploy \
+  --secret TELEGRAM_BOT_TOKEN=123456:ABC... \
+  --secret OPENAI_API_KEY=sk-... \
+  --env TELEGRAM_CHAT_ID=623508703
+```
+
+### Interactive setup (runner mode)
+```bash
+ifhost init --app my-project --port 3000 --memory 1024
+ifhost deploy
+# Then use console for setup:
+ifhost machines console start --app my-project -- bash
+ifhost machines console input --app my-project $SID "git clone ... && npm install; echo __DONE__"
+# Poll output, then start the app in a detached tmux session
+```
+
+---
+
+## Agent Decision Tree
+
+```
+Does the project publish a Docker image?
+├── YES → ifhost deploy --image <ref>
+│   ├── Simple web app → --memory 256, default settings, no storage
+│   ├── API with managed DB → --memory 512, pass DB_URL via --env, no storage
+│   ├── Heavy/AI app → --memory 1024+, --autostop=false, --min-machines 1
+│   └── SQLite/file-cache app → --storage local (PINS to 1 machine, no auto-scale)
+└── NO → ifhost deploy (runner mode, then console/exec to install)
+    ├── Simple setup → exec a few commands, start the app
+    └── Complex interactive setup → console session, drive the wizard
+```
+
+**Storage rule:** apps that need to scale across multiple machines must NOT use
+`storage = "local"` (the volume is pinned to one machine). For databases
+or any cross-machine state, use a managed service: Supabase, Neon, Upstash, Turso.
+
+---
+
+## Traps to Avoid
+
+| Trap | Symptom | Fix |
+|------|---------|-----|
+| PORT mismatch | App boots but 502 errors | Set `[service] internal_port` to match what the app listens on |
+| Low RAM | App killed silently (OOM) | Node.js needs 512MB+, AI/ML needs 1024MB+ |
+| Autostop kills slow apps | App never becomes reachable | `autostop = false` + `min_machines = 1` |
+| Env vars in config files | Values lost on restart | Use `--env` or `[env]` in impossible.toml |
+| Startup needs setup | App crashes on boot | Use `[build] cmd = "migrate && serve"` |
+| Scaled app needs setup | Standby machines wake unconfigured | Put ALL setup in `[build] cmd`, not in exec |
+| Bot killed by autostop | Bot stops responding after idle | `autostop = false` + `min_machines = 1` |
+| Secrets not in process env | App can't read API keys | Secrets ARE injected as env vars. Check logs, not exec |
+| Debugging spiral | Agent spends 20 min probing | Check logs first. Fix config and redeploy. |
+
+---
+
+## Debugging Workflow
+
+```bash
+# 1. Get full app context
+ifhost describe --app my-app
+
+# 2. Check recent errors
+ifhost machines logs --app my-app --level error --lines 20
+
+# 3. Check if app is running
+ifhost machines --app my-app
+
+# 4. If stopped, start it
+ifhost machines start --app my-app
+
+# 5. Watch live logs
+ifhost machines logs --app my-app
+
+# 6. Run a command inside the machine
+ifhost machines exec --app my-app -- env
+
+# 7. If app won't start, check the deploy
+ifhost describe --app my-app --json | jq '.deployments[0]'
+```
+
+---
+
+## Known Projects Cheat Sheet
+
+### OpenClaw (Telegram/Discord/Slack AI bot)
+
+**Use webhook mode, not long-polling.** Long-lived HTTPS polling connections stall every few minutes because edge proxies drop idle TCP. Webhook mode uses short HTTPS calls in both directions.
+
+**Port-swap trick:** Run the OpenClaw gateway on an internal-only port (19001) and bind the Telegram webhook listener to the exposed port (18789).
+
+**Complete `impossible.toml`:**
+
+```toml
+app = "my-claw"
+storage = "local"
+region = "iad"
+
+[service]
+internal_port = 18789
+autostop = false
+min_machines = 1
+
+[resources]
+cpu_kind = "shared"
+cpus = 2
+memory_mb = 2048
+
+[build]
+cmd = """mkdir -p /home/node/.openclaw && printf '{"agents":{"defaults":{"model":{"primary":"openai/gpt-5-nano"}}},"gateway":{"controlUi":{"enabled":false}},"channels":{"telegram":{"dmPolicy":"allowlist","allowFrom":["%s"],"webhookUrl":"https://%s/telegram-webhook","webhookSecret":"%s","webhookHost":"0.0.0.0","webhookPort":18789}}}' "${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID not set}" "${APP_URL:?APP_URL not set}" "${TG_WEBHOOK_SECRET:?TG_WEBHOOK_SECRET not set}" > /home/node/.openclaw/openclaw.json && exec node /app/openclaw.mjs gateway --bind lan --port 19001 --allow-unconfigured"""
+
+[env]
+NODE_ENV = "production"
+TELEGRAM_CHAT_ID = "<TG_USER_ID>"
+APP_URL = "<app-public-hostname>"
+NODE_OPTIONS = "--dns-result-order=ipv4first"
+```
+
+**Deploy:**
+```bash
+ifhost deploy --image ghcr.io/openclaw/openclaw:latest \
+  --secret OPENAI_API_KEY=sk-... \
+  --secret TELEGRAM_BOT_TOKEN=... \
+  --secret TG_WEBHOOK_SECRET=$(openssl rand -hex 24) \
+  --yes
+```
+
+**Timings:** ~1 min to deploy, ~5 min for gateway init, ~7 min total to ready.
+
+---
+
+## Pricing
+
+| Plan | Price | RAM Pool | Volume Pool | Max Autoscale | Custom Domains |
+|------|-------|----------|-------------|---------------|----------------|
+| Free | $0/mo | 256 MB | 1 GB | 1 | 0 |
+| Hobby | $15/mo | 2 GB | 5 GB | 3 | 3 |
+| Pro | $49/mo | 8 GB | 20 GB | 10 | 10 |
+| Team | $149/mo | 24 GB | 50 GB | 20 | unlimited |
+
+Upgrade: `ifhost plans subscribe <plan>` (or `ifhost sub subscribe <plan>`)
+
+---
+
+## Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output structured JSON (available on all commands) |
+| `--app <name>` | Override app name (on deploy, apply, describe, and all machines subcommands) |
+| `--yes` | Skip confirmation prompts (on deploy and all machines subcommands) |
