@@ -332,7 +332,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 | `--cmd` | (none) | Startup command |
 | `--autostop` | true | Set `false` for apps that take >60s to boot |
 | `--min-machines` | 0 | Set `1` for no cold starts |
-| `--storage` | (empty) | `local` provisions a 1 GB `/data` volume (grow later with `volumes extend`). Pins the app to ONE machine (no auto-scaling). Empty = stateless. |
+| `--storage` | (empty) | `local` provisions a 1 GB `/data` volume (grow later with `volumes extend`). Volumes are per-machine — keep volume apps at 1 machine (see Storage rule). Empty = stateless. |
 
 Generates `impossible.toml` in the current directory. Edit it directly after creation — do not re-run init (it errors if the file exists).
 
@@ -539,7 +539,11 @@ ifhost machines volumes extend my-data --to 10 --app my-app   # Grow only, canno
 ifhost machines volumes rm my-data --app my-app --yes
 ```
 
-Volume apps are pinned to one machine (no horizontal scaling).
+**Volumes are per-machine.** Auto-scaling is rejected for volume apps.
+Manual `machines scale` above 1 warns and requires `--yes`: each new machine
+gets its own EMPTY volume (your app/data are NOT copied), and replica
+volumes are deleted on scale-down. Scale a volume app only for per-machine
+scratch space — never for shared state.
 
 ### ifhost machines domains
 
@@ -763,15 +767,18 @@ Does the project publish a Docker image?
 │   ├── Simple web app → --memory 256, default settings, no storage
 │   ├── API with managed DB → --memory 512, pass DB_URL via --env, no storage
 │   ├── Heavy/AI app → --memory 1024+, --autostop=false, --min-machines 1
-│   └── SQLite/file-cache app → --storage local (PINS to 1 machine, no auto-scale)
+│   └── SQLite/file-cache app → --storage local (volumes are per-machine; keep at 1 machine)
 └── NO → ifhost deploy (runner mode, then console/exec to install)
     ├── Simple setup → exec a few commands, start the app
     └── Complex interactive setup → console session, drive the wizard
 ```
 
-**Storage rule:** apps that need to scale across multiple machines must NOT use
-`storage = "local"` (the volume is pinned to one machine). For databases
-or any cross-machine state, use a managed service: Supabase, Neon, Upstash, Turso.
+**Storage rule:** apps that need to scale across multiple machines must NOT
+rely on `storage = "local"` for shared state — volumes are per-machine.
+Each machine gets its own independent volume; a machine added by scaling
+starts with an EMPTY volume (nothing is copied), and replica volumes are
+deleted on scale-down. For databases or any cross-machine state, use a
+managed service: Supabase, Neon, Upstash, Turso.
 
 ---
 
