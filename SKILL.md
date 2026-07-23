@@ -343,8 +343,8 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
 | `--cpu-kind` | shared | `shared` or `performance` |
 | `--cmd` | (none) | DEPRECATED — writes `[build] cmd`, which deploys ignore. Start apps via `machines exec` instead |
-| `--autostop` | true | Set `false` for any app that must stay reachable — runner apps do NOT survive an idle-stop (VM wakes with no app process) |
-| `--min-machines` | 0 | Set `1` together with `--autostop=false` for always-on apps |
+| `--autostop` | false | Always-on is the platform default. Only set `true` for apps that may die on idle — runner apps do NOT survive an idle-stop (VM wakes with no app process) |
+| `--min-machines` | 0 | With the always-on default this rarely needs setting; pairs with explicit autostop |
 | `--storage` | (empty) | `local` provisions a 1 GB `/data` volume (grow later with `volumes extend`). Volumes are per-machine — keep volume apps at 1 machine (see Storage rule). Empty = stateless. |
 
 Generates `impossible.toml` in the current directory. Edit it directly after creation — do not re-run init (it errors if the file exists).
@@ -619,9 +619,9 @@ storage = "local"                  # "local" (/data volume, single machine) or o
 
 [service]
 internal_port = 3000               # Port app listens on (MUST match app)
-autostop = false                   # REQUIRED false for apps that must stay
-min_machines = 1                   #   reachable — runner apps do not survive
-                                   #   an idle-stop (VM wakes with no process)
+autostop = false                   # Always-on (the platform default). Never
+min_machines = 1                   #   set true for runner apps that must stay
+                                   #   reachable — they don't survive idle-stop
 
 [resources]
 cpu_kind = "shared"                # "shared" or "performance"
