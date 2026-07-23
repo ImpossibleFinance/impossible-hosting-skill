@@ -326,7 +326,6 @@ ifhost deploy [flags]
 |------|-------------|
 | `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
 | `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
-| `--cmd "..."` | Override startup command |
 | `--port N` | Override container port |
 | `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
 | `--storage local` | Provision a /data volume on first deploy. Empty = stateless. |
@@ -553,24 +552,23 @@ ifhost version                           # Show CLI version and check for update
 ifhost update                            # Update CLI to the latest version
 ```
 
-### ifhost plans (aliases: sub, subscription)
+### ifhost billing (alias: sub)
 
 ```bash
-ifhost plans status                       # Current subscription status
-ifhost plans subscribe hobby              # Subscribe to a plan (hobby, pro, team)
-ifhost plans subscribe --plan pro --pay crypto   # Specify payment method
-ifhost plans cancel                       # Cancel subscription
-ifhost plans invoices                     # Billing history
+ifhost billing status                     # Current subscription status
+ifhost billing subscribe hobby            # Subscribe to a plan (hobby, pro, team)
+ifhost billing subscribe --plan pro --pay crypto   # Specify payment method
+ifhost billing cancel                     # Cancel subscription
+ifhost billing invoices                   # Billing history
+ifhost billing plan                       # Show current plan and usage
+ifhost billing alert set --max 20         # Set spend alert at $20
+ifhost billing alert show                 # Show current alert
+ifhost billing alert off                  # Disable spend alert
 ```
 
-### ifhost billing
-
-```bash
-ifhost billing plan                 # Show current plan and usage
-ifhost billing alert set --max 20   # Set spend alert at $20
-ifhost billing alert show           # Show current alert
-ifhost billing alert off            # Disable spend alert
-```
+`subscribe` opens a hosted checkout page (pick card or crypto there). Card
+payments are coming soon; crypto (USDC) works today. `--pay crypto` is a
+compatibility spelling that still lands on the same hosted checkout.
 
 ---
 
@@ -753,7 +751,7 @@ ifhost describe --app my-app --json | jq '.deployments[0]'
 | Pro | $49/mo | 8 GB | 20 GB | 10 |
 | Team | $149/mo | 24 GB | 50 GB | unlimited |
 
-Upgrade: `ifhost plans subscribe <plan>` (or `ifhost sub subscribe <plan>`)
+Upgrade: `ifhost billing subscribe <plan>` (or `ifhost sub subscribe <plan>`)
 
 ---
 

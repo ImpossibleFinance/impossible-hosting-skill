@@ -60,7 +60,7 @@ export PATH="$HOME/.local/bin:$PATH"
 - Common patterns (static sites, APIs, heavy apps, interactive setup)
 - Non-blocking log monitoring via tmux console
 - Traps to avoid (port mismatch, OOM, autostop, env vars)
-- Post-deploy management (logs, exec, console, scale, destroy)
+- Post-deploy management (logs, exec, console, apply, destroy)
 - Full command reference with flags and examples
 
 ## Example agent interaction
