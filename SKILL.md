@@ -41,6 +41,10 @@ If you cannot get a 200, report exactly what state things are in.
 (dockerfile or cmd) is IGNORED — the platform never builds images and never
 runs a configured start command. Deploys boot the bare runner VM; you drive
 setup and startup yourself as above. The CLI warns when it sees `[build]`.
+Never CREATE a Dockerfile for an ifhost deploy — it will not be built. But
+if the repo already has one (local dev, other platforms), leave it alone;
+it simply isn't used here — and DO read it: it's the project's own setup
+recipe. See "Deriving runner steps from an existing Dockerfile" below.
 
 ### 1. Understand the project BEFORE deploying
 
@@ -48,6 +52,8 @@ setup and startup yourself as above. The CLI warns when it sees `[build]`.
 
 **Step A — Read the docs:**
 - README.md, INSTALL.md, docs/install/ folder, or any setup guide
+- An existing Dockerfile or docker-compose.yml — never built here, but it IS
+  the setup recipe (see "Deriving runner steps from an existing Dockerfile")
 - .env.example (lists ALL required env vars with descriptions)
 - Any config file templates (config.example.json, etc.)
 
@@ -268,6 +274,36 @@ ifhost machines console start --app <app> -- bash
 ```
 
 See "Interactive setup" in Common Deployment Patterns for the full console workflow.
+
+### Deriving runner steps from an existing Dockerfile
+
+If the repo has a Dockerfile, it will NOT be built — but don't ignore it:
+it is the project's own setup recipe, written by someone who knew the app.
+Read it FIRST and translate line-by-line into runner commands:
+
+| Dockerfile | Runner equivalent |
+|------------|-------------------|
+| `FROM python:3.12-slim` | `machines exec -- sh -c "apt-get update -qq && apt-get install -y python3"` (runner is already Debian; install the language runtime the base image implies) |
+| `FROM node:20` | install Node via apt or the project's preferred method |
+| `RUN <cmd>` | `machines exec -- sh -c "<cmd>"` verbatim |
+| `COPY . /app` | `machines push ./ --to /app --app X` |
+| `WORKDIR /app` | prefix later commands with `cd /app &&` |
+| `ENV K=V` | `[env]` in impossible.toml, or `--env K=V` on deploy |
+| secrets in ENV | `--secret K=V` / `machines secrets set` |
+| `EXPOSE 8080` | `[service] internal_port = 8080` |
+| `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /app && setsid nohup <cmd> > /tmp/app.log 2>&1 &"` |
+| `HEALTHCHECK` | your Rule 0b verify curl |
+| multi-stage builds | run the build-stage steps too; they may need a bigger volume (`volumes extend`) or more memory during install |
+
+Worked example — a static site whose Dockerfile is
+`FROM python:3.12-slim` + `COPY . .` + `CMD python3 -m http.server 8080 --directory /app`:
+
+```bash
+ifhost machines exec --app my-site -- sh -c "apt-get update -qq && apt-get install -y python3"
+ifhost machines push ./ --to /app --app my-site
+ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --directory /app > /tmp/app.log 2>&1 &"
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossi.build/   # must print 200
+```
 
 **Gotchas that burn tokens on runner deploys (learned the hard way):**
 
