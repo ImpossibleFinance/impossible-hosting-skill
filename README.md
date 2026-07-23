@@ -79,5 +79,6 @@ Deployed! Live at: https://my-api.host.impossi.build
 ## Links
 
 - [ifhost CLI](https://github.com/ImpossibleFinance/impossible-hosting)
+- [Runner deployment runbook](./RUNBOOK.md)
 - [Docs](https://host.impossi.build/docs)
 - [llm.txt](https://host.impossi.build/llm.txt)

@@ -1,11 +1,13 @@
 ---
 name: ifhost
-description: Deploy any app to Impossible Hosting with one command
+description: Deploy applications to Impossible Hosting runner VMs. Use when Codex needs to provision an app with ifhost, translate project setup into runner commands, transfer source safely, start the process, or verify and troubleshoot the public deployment.
 ---
 
 # ifhost — Deploy to Impossible Hosting
 
-Deploy any app to the cloud with one command. Each app gets its own isolated VM and HTTPS URL.
+Provision an isolated runner VM and HTTPS URL, then install, transfer, start,
+and verify the application explicitly. Use [RUNBOOK.md](RUNBOOK.md) for the
+ordered deployment and recovery procedure.
 
 ## Agent Rules
 
@@ -46,6 +48,16 @@ if the repo already has one (local dev, other platforms), leave it alone;
 it simply isn't used here — and DO read it: it's the project's own setup
 recipe. See "Deriving runner steps from an existing Dockerfile" below.
 
+**Persistence and restart contract.** Runner deploys with no explicit storage
+or volumes currently provision a 1 GB local volume at `/data`. Put application
+source and durable install state under `/data/app`; do not rely on `/app` or
+other root-filesystem paths surviving a machine restart. A detached process
+survives the `machines exec` session, but it does NOT auto-start after a
+machine restart. After any restart or redeploy, reinstall anything missing,
+start the app again, and repeat the public HTTP check.
+If unattended automatic recovery after a machine restart is a requirement,
+stop and report it as unsupported by the current runner workflow.
+
 ### 1. Understand the project BEFORE deploying
 
 **CRITICAL:** Before running `ifhost init` or `ifhost deploy`, complete this checklist:
@@ -60,14 +72,14 @@ recipe. See "Deriving runner steps from an existing Dockerfile" below.
 **Step B — Fill out this mental checklist:**
 ```
 Port:          ___  (check app docs, docker-compose ports, or app --help)
-RAM:           ___  (512MB for small apps, 1024MB+ for Node/Python, 2048MB+ if heavy)
+RAM:           ___  (512MB for small Node/Python apps, 1024MB+ for builds/background work, 2048MB+ if heavy)
 CPUs:          ___  (1 for simple, 2+ for AI/heavy compute)
 Autostop:      ___  (false for bots, long-polling services, or apps that take >60s to boot)
 Env vars:      ___  (list every KEY=VALUE the app needs)
 Secrets:       ___  (API keys, tokens — ask the user, never guess)
 Startup cmd:   ___  (setup before serving: config generation, migrations, --bind lan)
 Bind address:  ___  (many apps default to localhost — must bind to 0.0.0.0 or use --bind lan)
-Storage:       ___  (does the app write config/data to disk? → storage = "local")
+Storage:       ___  (runner default: 1 GB local /data; is that enough, and must state be shared?)
 Config files:  ___  (does the app need a JSON/YAML config file written before it starts?)
 ```
 
@@ -109,6 +121,9 @@ Show the impossible.toml you'll generate and the exact deploy command with all f
 Let the user confirm or correct before proceeding.
 
 Only after the user approves should you run `ifhost init` and `ifhost deploy`.
+If the user says not to modify the source repository, run both commands from
+a temporary workspace: `init` creates `impossible.toml`, and `deploy` may
+update it with the resolved app name or port.
 
 ### 2. Tell the user what's happening (observability)
 
@@ -198,7 +213,7 @@ If you're at 10+ minutes, you're overpolling — stop polling and report the act
 verified state: "app returned 200, done" or "no 200 yet, here's the last log line".
 Never round an unverified deploy up to "it's deployed".
 
-### 3. Read --help for exact syntax
+### 3. Read --help for command syntax
 
 Before running any ifhost command, check its help text:
 
@@ -207,7 +222,9 @@ ifhost deploy --help
 ifhost machines logs --help
 ```
 
-The CLI help is always up-to-date. Use this skill doc for the big picture and decision-making, but trust `--help` for exact syntax and available flags.
+Use the freshly updated CLI help to confirm command syntax and available
+flags. Do not infer runner lifecycle from generic examples in help output:
+`[build]` remains ignored, and applications must be started explicitly.
 
 ## Install / Update
 
@@ -254,8 +271,9 @@ mv ifhost ~/.local/bin/
 
 ```bash
 ifhost login                                          # Google OAuth (one-time)
-ifhost init --app my-app --port 3000 --memory 512     # Generate impossible.toml
-ifhost deploy                                         # Deploy
+ifhost init --app my-app --port 3000 --memory 512 --storage local
+ifhost deploy                                         # Provision the runner
+# Then install, transfer to /data/app, start, and verify an HTTP 200.
 ```
 
 ## How Deploys Work (runner mode)
@@ -265,7 +283,11 @@ setup step-by-step — install dependencies, write config, start the app —
 via `exec`, `write`, `push`, and `console`. There is no image build and no
 stack detection: you run the project's own install steps.
 
-**Why it works this way:** deploy finishes in ~15s (generic Debian shell VM, no build), you drive setup via console, install persists to `/data` volume — machine restarts skip install entirely. Tight feedback loop: iterate on config in the console without rebuild cycles. Immune to upstream changes.
+**Why it works this way:** deploy typically finishes quickly because there is
+no image build. Files under `/data` survive machine restarts, so keep source
+and other durable state there. Changes made elsewhere in the root filesystem
+may need to be recreated after a restart, and the application process must
+always be started again.
 
 ```bash
 ifhost deploy --secret KEY=VAL --yes
@@ -286,12 +308,12 @@ Read it FIRST and translate line-by-line into runner commands:
 | `FROM python:3.12-slim` | `machines exec -- sh -c "apt-get update -qq && apt-get install -y python3"` (runner is already Debian; install the language runtime the base image implies) |
 | `FROM node:20` | install Node via apt or the project's preferred method |
 | `RUN <cmd>` | `machines exec -- sh -c "<cmd>"` verbatim |
-| `COPY . /app` | `machines push ./ --to /app --app X` |
-| `WORKDIR /app` | prefix later commands with `cd /app &&` |
+| `COPY . /app` | `machines push ./ --to /data/app --app X` |
+| `WORKDIR /app` | prefix later commands with `cd /data/app &&` |
 | `ENV K=V` | `[env]` in impossible.toml, or `--env K=V` on deploy |
 | secrets in ENV | `--secret K=V` / `machines secrets set` |
 | `EXPOSE 8080` | `[service] internal_port = 8080` |
-| `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /app && setsid nohup <cmd> > /tmp/app.log 2>&1 &"` |
+| `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /data/app && setsid nohup <cmd> > /tmp/app.log 2>&1 &"` |
 | `HEALTHCHECK` | your Rule 0b verify curl |
 | multi-stage builds | run the build-stage steps too; they may need a bigger volume (`volumes extend`) or more memory during install |
 
@@ -300,8 +322,8 @@ Worked example — a static site whose Dockerfile is
 
 ```bash
 ifhost machines exec --app my-site -- sh -c "apt-get update -qq && apt-get install -y python3"
-ifhost machines push ./ --to /app --app my-site
-ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --directory /app > /tmp/app.log 2>&1 &"
+ifhost machines push ./ --to /data/app --app my-site
+ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
 curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossi.build/   # must print 200
 ```
 
@@ -381,7 +403,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 | `--cmd` | (none) | DEPRECATED — writes `[build] cmd`, which deploys ignore. Start apps via `machines exec` instead |
 | `--autostop` | false | Always-on is the platform default. Only set `true` for apps that may die on idle — runner apps do NOT survive an idle-stop (VM wakes with no app process) |
 | `--min-machines` | 0 | With the always-on default this rarely needs setting; pairs with explicit autostop |
-| `--storage` | (empty) | `local` provisions a 1 GB `/data` volume (grow later with `volumes extend`). Volumes are per-machine — keep volume apps at 1 machine (see Storage rule). Empty = stateless. |
+| `--storage` | (empty) | `local` records an explicit local-storage request. An empty init value omits storage from the manifest, but runner deploys with no declared volumes currently still provision a 1 GB `/data` volume. Volumes are per-machine. |
 
 Generates `impossible.toml` in the current directory. Edit it directly after creation — do not re-run init (it errors if the file exists).
 
@@ -401,15 +423,17 @@ ifhost deploy [flags]
 | `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
 | `--port N` | Override container port |
 | `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
-| `--storage local` | Provision a /data volume on first deploy. Empty = stateless. |
+| `--storage local` | Explicitly provision a `/data` volume on first deploy. With no storage flag or declared volumes, runner deploys currently provision a 1 GB `/data` volume automatically. |
 | `--app <name>` | Override app name from toml |
 | `--yes` | Skip confirmation prompts |
 | `--json` | Output structured JSON |
 
-Deploy boots a generic Debian runner VM in **~15 seconds**. Drive setup via
-`exec`/`write`/`console` after deploy.
+Deploy boots a generic Debian runner VM without building the application.
+Drive setup via `exec`/`write`/`console` after deploy.
 
-**After deploy:** Prints the live URL (e.g., `https://my-app.host.impossi.build`).
+**After deploy:** Prints the public URL (e.g.,
+`https://my-app.host.impossi.build`). The application is not live until you
+start it and verify HTTP `200`.
 
 ---
 
@@ -453,6 +477,8 @@ ifhost machines restart --app my-app
 ```
 
 Apps run on a single machine. Multi-machine scaling is on the roadmap.
+`restart` does not relaunch a process previously started with `setsid` or
+`nohup`; run the start command again and repeat the public HTTP check.
 
 ---
 
@@ -488,7 +514,7 @@ Run a one-off command inside a running machine. For commands that finish without
 
 ```bash
 ifhost machines exec --app my-app -- ls /data
-ifhost machines exec --app my-app -- env
+ifhost machines exec --app my-app -- sh -c 'test -n "$NODE_ENV" && echo NODE_ENV=set || echo NODE_ENV=unset'
 ifhost machines exec --app my-app --machine e784160df242e8 -- cat /var/log/app.log
 ```
 
@@ -524,7 +550,10 @@ ifhost machines console end --app my-app <session-id>
 
 ### ifhost machines env / secrets
 
-**Important:** `env set` and `secrets set` do NOT restart the machine by default. Pass `--restart` to apply immediately, or run `ifhost machines restart` afterward.
+**Important:** `env set` and `secrets set` do NOT restart the machine by
+default. Configure them before starting the app when possible. If you pass
+`--restart` or run `machines restart`, start the application again afterward
+and repeat the public HTTP check.
 
 ```bash
 ifhost machines env set KEY=VALUE --app my-app              # Set (no restart)
@@ -565,6 +594,16 @@ ifhost machines write <local-file> --to <remote-path> --app my-app              
 ifhost machines write <local-file> --to <remote-path> --machine <id> --app my-app   # Target specific machine
 ifhost machines push <local-dir> --to <remote-dir> --app my-app                     # Push a directory tree
 ```
+
+`write` splits files into 32 KiB chunks and caps each file at 10 MiB. `push`
+uses the same chunked transport and caps the compressed archive at 10 MiB;
+it does not accept `--machine`. `push` honors `.gitignore`, `.dockerignore`,
+and `.impignore`, applies built-in exclusions such as `.git`, `node_modules`,
+and `.env*`, and skips symlinks and individual files larger than 50 MB. Inspect
+the staged file set anyway. For larger payloads, clone a public repository or
+download a trusted artifact from inside the runner. Never copy private Git
+credentials into the runner. For private source, use `push` when it fits or a
+user-approved short-lived artifact URL.
 
 ### ifhost machines wait-for
 
@@ -651,7 +690,7 @@ Full example with all fields:
 
 ```toml
 app = "my-app"
-storage = "local"                  # "local" (/data volume, single machine) or omit (stateless)
+storage = "local"                  # Explicit /data volume dependency; single-machine app
 
 [service]
 internal_port = 3000               # Port app listens on (MUST match app)
@@ -673,19 +712,10 @@ DATABASE_URL = "postgres://..."
 
 ```
 
-**About `[build] cmd`:** Despite its name, this is a RUNTIME startup command, NOT a
-build-time step. It runs via `sh -c "<cmd>"` on every machine boot. Shell
-features work: pipes, `&&`, `$ENV_VARS`.
-
-**Secrets and env vars in `[build] cmd`:** All secrets set via `--secret` and env vars
-from `[env]` are available as environment variables when `[build] cmd` runs.
-
-**Apps that need a config file at boot:** Use `[build] cmd` to generate it from env vars:
-
-```toml
-[build]
-cmd = """mkdir -p /data && printf '{"token":"%s","model":"%s"}' "$BOT_TOKEN" "$MODEL" > /data/config.json && exec node server.js"""
-```
+There is no manifest startup hook. If an app needs a generated config file,
+create it explicitly with `machines exec` or `machines write` before starting
+the process. Repeat that setup after a restart when the generated file is not
+under `/data`.
 
 **Secrets:** Pass via `--secret` on the deploy command, NOT in the toml file:
 ```bash
@@ -732,9 +762,6 @@ cpu_kind = "shared"
 cpus = 2
 memory_mb = 1024
 
-[build]
-cmd = "node server.js --bind lan --port 3000"
-
 [env]
 NODE_ENV = "production"
 ```
@@ -744,15 +771,18 @@ ifhost deploy \
   --secret TELEGRAM_BOT_TOKEN=123456:ABC... \
   --secret OPENAI_API_KEY=sk-... \
   --env TELEGRAM_CHAT_ID=623508703
+ifhost machines push ./ --to /data/app --app my-bot
+ifhost machines exec --app my-bot -- sh -c "cd /data/app && npm install"
+ifhost machines exec --app my-bot -- sh -c "cd /data/app && setsid nohup node server.js --bind lan --port 3000 > /tmp/app.log 2>&1 < /dev/null &"
 ```
 
 ### Interactive setup (runner mode)
 ```bash
-ifhost init --app my-project --port 3000 --memory 1024
+ifhost init --app my-project --port 3000 --memory 1024 --storage local
 ifhost deploy
 # Then use console for setup:
 ifhost machines console start --app my-project -- bash
-ifhost machines console input --app my-project $SID "git clone ... && npm install; echo __DONE__"
+ifhost machines console input --app my-project $SID "git clone ... /data/app && cd /data/app && npm install; echo __DONE__"
 # Poll output, then start the app in a detached tmux session
 ```
 
@@ -761,11 +791,11 @@ ifhost machines console input --app my-project $SID "git clone ... && npm instal
 ## Agent Decision Tree
 
 ```
-ifhost deploy (runner VM), then:
-├── Simple web app        → --memory 256, exec a few install commands, start the app
+ifhost deploy (runner VM with a default 1 GB /data volume), then:
+├── Simple web app        → --memory 256, transfer to /data/app, start the app
 ├── API with managed DB   → --memory 512, pass DB_URL via --env
 ├── Heavy/AI app          → --memory 1024+, --autostop=false, --min-machines 1
-├── SQLite/file-cache app → --storage local (volumes are per-machine)
+├── SQLite/file-cache app → keep state under /data and stay single-machine
 └── Complex interactive setup → console session, drive the wizard
 ```
 
@@ -784,6 +814,7 @@ Shared volumes are on the roadmap.
 | Autostop stops the VM | App worked, then hangs forever after idle (runner apps don't survive a stop) | `autostop = false` + `min_machines = 1` |
 | Env vars in config files | Values lost on restart | Use `--env` or `[env]` in impossible.toml |
 | Expecting `[build]` to run | App never starts — the section is ignored | Start via `machines exec` with `setsid nohup` |
+| Expecting restart to relaunch the app | `/data` survives but the public URL fails | Reinstall anything missing, rerun the start command, and verify HTTP `200` |
 | Bot killed by autostop | Bot stops responding after idle | `autostop = false` + `min_machines = 1` |
 | Declaring success at deploy | Customer opens a dead page | Deploy is done ONLY when curl returns 200 (Rule 0b) |
 | Secrets not in process env | App can't read API keys | Secrets ARE injected as env vars. Check logs, not exec |
@@ -809,8 +840,8 @@ ifhost machines start --app my-app
 # 5. Watch live logs
 ifhost machines logs --app my-app
 
-# 6. Run a command inside the machine
-ifhost machines exec --app my-app -- env
+# 6. Check one non-secret variable without dumping the process environment
+ifhost machines exec --app my-app -- sh -c 'test -n "$NODE_ENV" && echo NODE_ENV=set || echo NODE_ENV=unset'
 
 # 7. If app won't start, check the deploy
 ifhost describe --app my-app --json | jq '.deployments[0]'
