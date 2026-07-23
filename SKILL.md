@@ -9,6 +9,39 @@ Deploy any app to the cloud with one command. Each app gets its own isolated VM 
 
 ## Agent Rules
 
+### 0. Update the CLI binary first, every session
+
+The platform evolves quickly; a stale binary prints stale guidance and
+accepts flags that no longer do anything. Before ANY ifhost work, refresh
+the binary — the installer is idempotent and takes ~2 seconds:
+
+```bash
+curl -fsSL https://host.impossi.build/install | sh
+```
+
+Never skip this because "ifhost is already installed" — installed is not
+the same as current.
+
+### 0b. Deploy ≠ live — never declare success without a 200
+
+`ifhost deploy` succeeding means the VM is provisioned, NOTHING more. The
+VM boots as a bare shell with no app process; the CLI prints "Runner VM
+ready — your app is NOT live yet". You are done only when ALL of:
+
+1. You installed and STARTED the app (survives the exec session:
+   `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> > /tmp/app.log 2>&1 &"`)
+2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossi.build/`
+   printed `200` (or the app's health endpoint did)
+
+Until then, NEVER tell the user "deployed", "live", or "running" — a
+declared-but-dead deployment is the single worst outcome for a customer.
+If you cannot get a 200, report exactly what state things are in.
+
+**No Dockerfile or build deploys.** A `[build]` section in impossible.toml
+(dockerfile or cmd) is IGNORED — the platform never builds images and never
+runs a configured start command. Deploys boot the bare runner VM; you drive
+setup and startup yourself as above. The CLI warns when it sees `[build]`.
+
 ### 1. Understand the project BEFORE deploying
 
 **CRITICAL:** Before running `ifhost init` or `ifhost deploy`, complete this checklist:
@@ -155,7 +188,9 @@ What to do instead:
 4. If the user reports the integration didn't work, THEN check logs
 
 Time budget: a deploy task should take **~3-5 minutes total** (init + deploy + verify).
-If you're at 10+ minutes, you're overpolling. Stop, tell the user it's deployed, move on.
+If you're at 10+ minutes, you're overpolling — stop polling and report the actual
+verified state: "app returned 200, done" or "no 200 yet, here's the last log line".
+Never round an unverified deploy up to "it's deployed".
 
 ### 3. Read --help for exact syntax
 
@@ -168,13 +203,15 @@ ifhost machines logs --help
 
 The CLI help is always up-to-date. Use this skill doc for the big picture and decision-making, but trust `--help` for exact syntax and available flags.
 
-## Install
+## Install / Update
 
 ```bash
 curl -fsSL https://host.impossi.build/install | sh
 ```
 
-This downloads the correct binary for the current OS/architecture (macOS/Linux, amd64/arm64)
+Run this at the start of EVERY session, not just the first (Rule 0) — it
+updates an existing binary in place. It downloads the correct binary for the
+current OS/architecture (macOS/Linux, amd64/arm64)
 and installs it to `~/.local/bin/ifhost`. If `~/.local/bin` is not in PATH, add it:
 
 ```bash
@@ -305,9 +342,9 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
 | `--cpu-kind` | shared | `shared` or `performance` |
-| `--cmd` | (none) | Startup command |
-| `--autostop` | true | Set `false` for apps that take >60s to boot |
-| `--min-machines` | 0 | Set `1` for no cold starts |
+| `--cmd` | (none) | DEPRECATED — writes `[build] cmd`, which deploys ignore. Start apps via `machines exec` instead |
+| `--autostop` | true | Set `false` for any app that must stay reachable — runner apps do NOT survive an idle-stop (VM wakes with no app process) |
+| `--min-machines` | 0 | Set `1` together with `--autostop=false` for always-on apps |
 | `--storage` | (empty) | `local` provisions a 1 GB `/data` volume (grow later with `volumes extend`). Volumes are per-machine — keep volume apps at 1 machine (see Storage rule). Empty = stateless. |
 
 Generates `impossible.toml` in the current directory. Edit it directly after creation — do not re-run init (it errors if the file exists).
@@ -582,16 +619,17 @@ storage = "local"                  # "local" (/data volume, single machine) or o
 
 [service]
 internal_port = 3000               # Port app listens on (MUST match app)
-autostop = false                   # false for bots / slow-booting apps
-min_machines = 1                   # 1 = no cold starts
+autostop = false                   # REQUIRED false for apps that must stay
+min_machines = 1                   #   reachable — runner apps do not survive
+                                   #   an idle-stop (VM wakes with no process)
 
 [resources]
 cpu_kind = "shared"                # "shared" or "performance"
 cpus = 2                           # 1, 2, 4, 8
 memory_mb = 1024                   # 256, 512, 1024, 2048, 4096
 
-[build]
-cmd = "migrate && start"           # Startup command (see notes below)
+# NOTE: no [build] section — Dockerfiles and build/start commands are not
+# supported and are ignored if present. Start the app via machines exec.
 
 [env]
 NODE_ENV = "production"
@@ -629,7 +667,8 @@ ifhost deploy --env DATABASE_URL=postgres://...
 ifhost machines exec --app my-api -- sh -c "apt-get update && apt-get install -y curl git"
 ifhost machines push ./ --to /data/app --app my-api
 ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
-# Start the app via [build] cmd in impossible.toml, or in a detached tmux session
+ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js > /tmp/app.log 2>&1 &"
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossi.build/   # must print 200
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)
@@ -706,10 +745,11 @@ Shared volumes are on the roadmap.
 |------|---------|-----|
 | PORT mismatch | App boots but 502 errors | Set `[service] internal_port` to match what the app listens on |
 | Low RAM | App killed silently (OOM) | Node.js needs 512MB+, AI/ML needs 1024MB+ |
-| Autostop kills slow apps | App never becomes reachable | `autostop = false` + `min_machines = 1` |
+| Autostop stops the VM | App worked, then hangs forever after idle (runner apps don't survive a stop) | `autostop = false` + `min_machines = 1` |
 | Env vars in config files | Values lost on restart | Use `--env` or `[env]` in impossible.toml |
-| Startup needs setup | App crashes on boot | Use `[build] cmd = "migrate && serve"` |
+| Expecting `[build]` to run | App never starts — the section is ignored | Start via `machines exec` with `setsid nohup` |
 | Bot killed by autostop | Bot stops responding after idle | `autostop = false` + `min_machines = 1` |
+| Declaring success at deploy | Customer opens a dead page | Deploy is done ONLY when curl returns 200 (Rule 0b) |
 | Secrets not in process env | App can't read API keys | Secrets ARE injected as env vars. Check logs, not exec |
 | Debugging spiral | Agent spends 20 min probing | Check logs first. Fix config and redeploy. |
 
