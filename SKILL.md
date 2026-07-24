@@ -31,7 +31,7 @@ VM boots as a bare shell with no app process; the CLI prints "Runner VM
 ready — your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
-   `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> > /tmp/app.log 2>&1 &"`)
+   `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
 2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossi.build/`
    printed `200` (or the app's health endpoint did)
 
@@ -305,15 +305,15 @@ Read it FIRST and translate line-by-line into runner commands:
 
 | Dockerfile | Runner equivalent |
 |------------|-------------------|
-| `FROM python:3.12-slim` | `machines exec -- sh -c "apt-get update -qq && apt-get install -y python3"` (runner is already Debian; install the language runtime the base image implies) |
+| `FROM python:3.12-slim` | `machines install --app X python3` (runner is already Debian; install the language runtime the base image implies) |
 | `FROM node:20` | install Node via apt or the project's preferred method |
 | `RUN <cmd>` | `machines exec -- sh -c "<cmd>"` verbatim |
-| `COPY . /app` | `machines push ./ --to /data/app --app X` |
+| `COPY . /app` | `machines push ./ --to /data/app --app X --yes-replace` |
 | `WORKDIR /app` | prefix later commands with `cd /data/app &&` |
 | `ENV K=V` | `[env]` in impossible.toml, or `--env K=V` on deploy |
 | secrets in ENV | `--secret K=V` / `machines secrets set` |
 | `EXPOSE 8080` | `[service] internal_port = 8080` |
-| `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /data/app && setsid nohup <cmd> > /tmp/app.log 2>&1 &"` |
+| `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /data/app && setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"` |
 | `HEALTHCHECK` | your Rule 0b verify curl |
 | multi-stage builds | run the build-stage steps too; they may need a bigger volume (`volumes extend`) or more memory during install |
 
@@ -321,21 +321,22 @@ Worked example — a static site whose Dockerfile is
 `FROM python:3.12-slim` + `COPY . .` + `CMD python3 -m http.server 8080 --directory /app`:
 
 ```bash
-ifhost machines exec --app my-site -- sh -c "apt-get update -qq && apt-get install -y python3"
-ifhost machines push ./ --to /data/app --app my-site
+ifhost machines install --app my-site python3
+printf '%s\n' 'state/data.db' > .ifhost-state-paths  # only when the app owns this runtime path
+ifhost machines push ./ --to /data/app --app my-site --yes-replace
 ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
 curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossi.build/   # must print 200
 ```
 
 **Gotchas that burn tokens on runner deploys (learned the hard way):**
 
-- **Front-load apt deps before running the project's install script.** The runner base image is minimal — only `tmux` and `ca-certificates` are preinstalled; no `curl`, `xz-utils`, `procps`, or `git` out of the box. Start every runner session with:
+- **Front-load system deps before running the project's install script.** The runner base image is minimal — only `tmux` and `ca-certificates` are preinstalled; no `curl`, `xz-utils`, `procps`, or `git` out of the box. Use the detached, verified installer:
   ```
-  apt-get update && apt-get install -y curl xz-utils procps git
+  ifhost machines install --app X curl xz-utils procps git
   ```
   Discovering each missing tool one failure at a time wastes 30s+ per round trip.
 - **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before any `curl | bash`.
-- **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths for binaries in tmux commands, or `bash -lc` to get login-shell PATH.
+- **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths or set an explicit administrative `PATH` inside `/bin/sh`; do not assume `bash -lc` exists.
 - **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10x more tokens than just answering arrow-key prompts.
 - **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
 - **PID files may be JSON, not integers.** Hermes writes `{"pid": 9249, "kind": "hermes-gateway", ...}` to `gateway.pid`. `kill $(cat pidfile)` fails with "arguments must be process or job IDs". Parse with `grep -oE '"pid":\s*[0-9]+' file | grep -oE '[0-9]+'`.
@@ -554,6 +555,7 @@ ifhost machines console end --app my-app <session-id>
 default. Configure them before starting the app when possible. If you pass
 `--restart` or run `machines restart`, start the application again afterward
 and repeat the public HTTP check.
+Replacing existing values non-interactively requires `--yes-replace`.
 
 ```bash
 ifhost machines env set KEY=VALUE --app my-app              # Set (no restart)
@@ -595,15 +597,22 @@ ifhost machines write <local-file> --to <remote-path> --machine <id> --app my-ap
 ifhost machines push <local-dir> --to <remote-dir> --app my-app                     # Push a directory tree
 ```
 
-`write` splits files into 32 KiB chunks and caps each file at 10 MiB. `push`
-uses the same chunked transport and caps the compressed archive at 10 MiB;
-it does not accept `--machine`. `push` honors `.gitignore`, `.dockerignore`,
-and `.impignore`, applies built-in exclusions such as `.git`, `node_modules`,
-and `.env*`, and skips symlinks and individual files larger than 50 MB. Inspect
-the staged file set anyway. For larger payloads, clone a public repository or
-download a trusted artifact from inside the runner. Never copy private Git
-credentials into the runner. For private source, use `push` when it fits or a
-user-approved short-lived artifact URL.
+`write` caps each file at 10 MiB. `push` has no arbitrary total archive cap.
+Both use verified 8 MiB raw chunks, resume from the last acknowledged chunk,
+and verify the complete file/archive before changing the destination. `write`
+accepts `--machine`; `push` does not.
+
+Before `push`, create `.ifhost-state-paths` in the local source root with
+relative paths the running app owns, one per line (for example
+`state/data.db` or `uploads/`). On redeploy those paths are snapshotted outside
+the target and restored byte-for-byte. An empty/missing declaration means no
+runtime state is protected and produces a warning. Review the manifest, then
+pass `--yes-replace` for non-interactive replacement.
+
+`push` honors `.gitignore`, `.dockerignore`, and `.impignore`, applies built-in
+exclusions such as `.git`, `node_modules`, and `.env*`, and skips symlinks and
+individual files larger than 50 MB. It checks target free space before upload.
+Never copy private Git credentials into the runner.
 
 ### ifhost machines wait-for
 
@@ -623,8 +632,8 @@ ifhost machines wait-for --file /data/startup.log --match "ready" --timeout 2m -
 ### ifhost machines destroy
 
 ```bash
-ifhost machines destroy --app my-app --yes              # Delete entire app + resources
-ifhost machines destroy <machine-id> --app my-app       # Delete single machine
+ifhost machines destroy --yes-irreversible --app my-app                # Delete entire app + resources
+ifhost machines destroy --yes-irreversible <machine-id> --app my-app   # Delete single machine
 ```
 
 ### ifhost apply
@@ -730,10 +739,10 @@ ifhost deploy --secret API_KEY=sk-... --secret BOT_TOKEN=123:ABC
 ```bash
 ifhost init --app my-api --port 3000 --memory 512 --storage local
 ifhost deploy --env DATABASE_URL=postgres://...
-ifhost machines exec --app my-api -- sh -c "apt-get update && apt-get install -y curl git"
-ifhost machines push ./ --to /data/app --app my-api
+ifhost machines install --app my-api curl git nodejs npm
+ifhost machines push ./ --to /data/app --app my-api --yes-replace
 ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
-ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js > /tmp/app.log 2>&1 &"
+ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
 curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossi.build/   # must print 200
 ```
 
@@ -771,7 +780,7 @@ ifhost deploy \
   --secret TELEGRAM_BOT_TOKEN=123456:ABC... \
   --secret OPENAI_API_KEY=sk-... \
   --env TELEGRAM_CHAT_ID=623508703
-ifhost machines push ./ --to /data/app --app my-bot
+ifhost machines push ./ --to /data/app --app my-bot --yes-replace
 ifhost machines exec --app my-bot -- sh -c "cd /data/app && npm install"
 ifhost machines exec --app my-bot -- sh -c "cd /data/app && setsid nohup node server.js --bind lan --port 3000 > /tmp/app.log 2>&1 < /dev/null &"
 ```

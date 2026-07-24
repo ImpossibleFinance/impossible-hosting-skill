@@ -153,18 +153,18 @@ CMD ["python3", "-m", "http.server", "8080", "--directory", "/app"]
 becomes:
 
 ```bash
-ifhost machines exec \
-  --app <app-name> \
-  --machine <machine-id> \
-  -- sh -c "apt-get update -qq && apt-get install -y python3"
+ifhost machines install --app <app-name> python3
 ```
 
 Translate image-internal paths such as `/app` to the runner's durable
 `/data/app` path.
 
-Install all known dependencies together instead of discovering them one
-failure at a time. Only `/data` is durable storage; after a machine restart,
-confirm any runtime installed elsewhere still exists before relaunching.
+`machines install` launches a detached package-manager worker, streams only
+new log lines, waits for apt/dpkg locks, and verifies every requested package.
+Rerun the same command if a transient request fails. Install all known
+dependencies together instead of discovering them one failure at a time.
+Only `/data` is durable storage; after a machine restart, confirm any runtime
+installed elsewhere still exists before relaunching.
 
 ## 5. Transfer source
 
@@ -172,8 +172,8 @@ Choose the lowest-risk available method.
 
 ### Public repository or artifact
 
-Prefer downloading inside the VM. This avoids the control-plane upload limit
-and per-chunk request overhead:
+Downloading inside the VM remains useful when the source is already a trusted
+public artifact:
 
 ```bash
 ifhost machines exec \
@@ -185,24 +185,40 @@ ifhost machines exec \
 For release archives, use a trusted HTTPS URL and verify its checksum before
 extracting it.
 
-### Small local source tree
+### Local source tree
 
-Use `push` when its compressed archive is at most 10 MiB. It uploads in
-32 KiB chunks and does not accept `--machine`:
+Declare every path the running application owns before the first push:
 
 ```bash
-ifhost machines push . --to /data/app --app <app-name>
+printf '%s\n' 'state/data.db' 'uploads/' > .ifhost-state-paths
+```
+
+Paths are relative to the push target. An empty or missing declaration means
+no runtime state is protected and produces a loud warning.
+
+`push` spools a tarball locally, uploads verified 8 MiB chunks, resumes from
+the last acknowledged chunk after interruption, verifies the complete archive
+SHA-256, then replaces the target under a lock. There is no arbitrary total
+archive cap; target free space is checked before upload. `push` does not accept
+`--machine`:
+
+```bash
+ifhost machines push . --to /data/app --app <app-name> --yes-replace
 ```
 
 `push` honors `.gitignore`, `.dockerignore`, and `.impignore`, applies built-in
 exclusions such as `.git`, `node_modules`, and `.env*`, and skips symlinks and
 individual files larger than 50 MB. Inspect the staged file set so required
-files are present and secrets are absent.
+files are present and secrets are absent. On redeploy, declared state paths are
+snapshotted outside the target and restored byte-for-byte. Automatic rollback
+is not claimed; if the transaction fails, stop and inspect the recovery paths
+printed by the CLI.
 
 ### Individual small files
 
 Use `write` for an individual file of at most 10 MiB and pin the machine.
-Files larger than 32 KiB are split into chunks automatically:
+It uses the same verified 8 MiB resumable chunks, verifies the complete file
+beside the target, and performs a same-filesystem atomic rename:
 
 ```bash
 ifhost machines write \
@@ -218,7 +234,7 @@ Do not copy local Git credentials into the runner.
 
 Use one of:
 
-1. `machines push` when the source fits and the uploader is healthy.
+1. `machines push` for a local source tree.
 2. A user-approved, short-lived signed artifact URL.
 3. An existing public artifact only after every required file has been proven
    byte-identical to the approved local source.
@@ -310,39 +326,29 @@ internal log messages.
 | `name already taken` | App names are globally unique | Ask the user for another name |
 | Deploy succeeds but URL fails | The runner exists but no app is listening | Install, transfer, start, and verify the process |
 | Persistent `502` | No listener, wrong port, loopback-only bind, or crashed process | Check the configured port, bind address, process, and recent logs |
-| `429 ... rate limit exceeded` | Too many machine API requests in the current window | Stop retrying, honor `Retry-After`, then reduce request count |
+| Upload reports a rate-limit wait | The CLI exhausted the current request window | Let its bounded wait/resume finish; do not start a second manual retry loop |
 | `gzip: stdin: not in gzip format` | Uploaded archive may be incomplete or corrupt | Compare local and remote byte counts before retrying |
-| `cannot stat ...partial` | The uploader reported a staging write that did not persist | Minimize to one small file and use a pinned `machines write` test |
+| Deterministic upload `400`/`409` | Identity, checksum, or cursor state is inconsistent | Do not retry-loop; report the exact error. The destination was not replaced |
+| Transient upload fails after bounded retries | Network, SFTP, or remote commit stayed unavailable | Rerun the same command; acknowledged chunks are not retransmitted |
 | Session expired | Authentication is stale | Run `ifhost login`, then re-run `ifhost status` |
 
-### Uploader incident observed on CLI build `20260723-124804`
+### Current uploader recovery contract
 
-The following is incident evidence, not a permanent API contract:
+The obsolete exec/base64 uploader and its 32 KiB chunks are no longer the
+project-transfer path. Current `push` and non-empty `write` commands use raw,
+verified 8 MiB chunks through an authenticated backend endpoint and Fly SFTP.
+The checksum headers are integrity metadata between the CLI and ifhost
+backend; they are not secrets and are not forwarded to Fly.
 
-- The machine API allowed 20 exec requests per minute.
-- An 8.6 MB `machines push` hit HTTP `429` at chunk `20/264`.
-- A 38,733-byte compressed archive reached the VM as only its final
-  6,957-byte chunk.
-- An 11,253-byte text write succeeded.
-- A 14,349-byte archive staging write disappeared before rename.
-- The app had one machine, and marker files persisted across exec calls in
-  `/tmp`, `/app`, and `/data`.
+Safe recovery is branch-specific:
 
-That evidence ruled out machine drift and a generally ephemeral filesystem.
-It was consistent with a mismatch between the CLI's 32 KiB upload chunks and
-a smaller effective command-transport limit, but did not prove that cause.
-
-When these symptoms appear:
-
-1. Update the CLI and retry one minimized file.
-2. Do not repeatedly retry a large `push`; it compounds rate limiting.
-3. Prefer an in-VM public clone or trusted artifact download.
-4. For a private source, request an approved signed artifact instead of
-   exposing credentials.
-5. If using a pre-existing public artifact, require complete SHA-256
-   equivalence before and after transfer.
-6. If no safe transfer path remains, report the deployment as provisioned but
-   not live.
+1. Interruption or exhausted transient failure: rerun the exact same command.
+2. The CLI queries the remote cursor and skips acknowledged chunks.
+3. A full checksum is mandatory before extraction or target replacement.
+4. A deterministic identity/cursor/checksum rejection must be reported, not
+   looped.
+5. On successful push, tarball, cursor, and parts are removed; lock files may
+   remain harmlessly.
 
 ## Handoff record
 
