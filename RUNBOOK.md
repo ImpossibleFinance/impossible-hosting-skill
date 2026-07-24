@@ -18,13 +18,18 @@ A deployment is complete only when:
 
 ## Guardrails
 
-- Refresh the CLI before every deployment session:
+- Install the CLI when missing, then let it update itself and sync the current
+  verified skill bundle before every deployment session:
 
   ```bash
-  curl -fsSL https://host.impossi.build/install | sh
+  command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossi.build/install | sh
   ifhost version
+  ifhost skill sync
   ```
 
+- If `skill sync` prints paths different from the files currently loaded,
+  read the refreshed files before continuing. A checksum failure is a hard
+  stop; do not use a partially updated bundle.
 - Use the freshly updated CLI's `--help` to confirm command syntax and
   available flags. Do not infer runner lifecycle from generic examples:
   `[build]` is ignored and the app must be started explicitly.

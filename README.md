@@ -25,6 +25,17 @@ curl -fsSL https://host.impossi.build/install | sh
 ```
 
 Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS and Linux (amd64/arm64).
+The CLI checks hourly, verifies the release checksum, updates atomically, and
+re-runs the requested command. Set `IFHOST_AUTO_UPDATE=0` to pin a version.
+
+Refresh the agent instructions with:
+
+```bash
+ifhost skill sync
+```
+
+This verifies `SKILL.md` and `RUNBOOK.md` before replacing the local cached
+copies under `~/.impossible/skill/`.
 
 If the script fails, download directly:
 

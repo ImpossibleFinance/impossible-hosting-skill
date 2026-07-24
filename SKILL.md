@@ -11,18 +11,25 @@ ordered deployment and recovery procedure.
 
 ## Agent Rules
 
-### 0. Update the CLI binary first, every session
+### 0. Refresh the CLI and these instructions first, every session
 
-The platform evolves quickly; a stale binary prints stale guidance and
-accepts flags that no longer do anything. Before ANY ifhost work, refresh
-the binary — the installer is idempotent and takes ~2 seconds:
+The platform evolves quickly. Before ANY ifhost work, install the CLI if it is
+missing; otherwise invoking it performs its checksum-verified automatic update.
+Then sync the checksum-verified skill bundle:
 
 ```bash
-curl -fsSL https://host.impossi.build/install | sh
+command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossi.build/install | sh
+ifhost version
+ifhost skill sync
 ```
 
-Never skip this because "ifhost is already installed" — installed is not
-the same as current.
+`skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
+paths. If this file was loaded from another path, read those refreshed files
+now and continue from them. If it fails verification, stop and report the
+failure instead of deploying from partially updated instructions.
+
+Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
+`ifhost update` remains available for an explicit update.
 
 ### 0b. Deploy ≠ live — never declare success without a 200
 

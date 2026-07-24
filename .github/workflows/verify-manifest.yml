@@ -1,0 +1,21 @@
+name: Verify skill manifest
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify documented checksums
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          manifest = json.loads(pathlib.Path("manifest.json").read_text())
+          for name in ("SKILL.md", "RUNBOOK.md"):
+              actual = hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
+              assert actual == manifest["files"][name], f"{name}: {actual}"
+          PY
