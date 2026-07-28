@@ -435,7 +435,7 @@ ifhost deploy [flags]
 | `--app <name>` | Override app name from toml |
 | `--yes` | Skip confirmation prompts |
 | `--json` | Output structured JSON |
-| `--recreate-app` | **Destructive recovery only.** See "Two errors that mean stop" below. Never pass this to clear an error. |
+| `--recreate-app` | Silences the advisory shown when impossible.toml names an app the server has no record of. Deploy proceeds either way. |
 
 Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
@@ -453,14 +453,9 @@ pointed at it keeps working. Shipping new code never changes an address.
 (It does kill any running process — re-run your install and start steps, then
 re-verify the 200.)
 
-#### Two errors that mean stop and ask the user
+#### One error that means stop, and one note that does not
 
-`ifhost deploy` refuses instead of guessing when creating a new app would be
-destructive. Both are hard stops. Do not work around them, and in particular
-**never invent a different app name to get moving** — that strands the user's
-custom domain on an app nobody deploys to any more.
-
-**1. Existence could not be verified**
+**STOP — existence could not be verified**
 
 ```
 could not verify whether app "my-app" exists: API error (500): ...
@@ -468,24 +463,31 @@ could not verify whether app "my-app" exists: API error (500): ...
   custom domain pointing here.
 ```
 
-The API errored, so the CLI does not know whether the app exists. This is
-transient. Wait, then re-run the identical command. Never respond by renaming.
+The API errored, so the CLI does not know whether the app already exists. It
+refuses rather than risk creating a second app alongside a live one.
 
-**2. The app named in impossible.toml is gone from the server**
+This is transient. Wait, then re-run the identical command. **Never respond by
+renaming the app** — a different name strands the user's custom domain on an
+app nobody deploys to any more. If it persists, report it; do not work around it.
+
+**NOT an error — the toml names an app the server doesn't have**
 
 ```
-App "my-app" is named in impossible.toml but the server returned no record for it.
-...
-  ifhost deploy --app my-app --recreate-app
+Note: impossible.toml already names "my-app" but the server has no record of it.
+  If this app existed before, it is being created fresh and gets new addresses —
+  update any custom domain DNS afterwards.
 ```
 
-Recreating makes a **new** app with a **new** address. Any custom domain
-pointing at the old address stops resolving until its DNS is updated by hand.
+This is an advisory and the deploy proceeds. It appears on the **normal first
+deploy** after `ifhost init` (the toml names the app before it exists), and it
+also appears if an app was previously destroyed. The CLI cannot tell those
+apart, so it tells you rather than guessing.
 
-**Ask the user before passing `--recreate-app`.** Treat it exactly like
-`--yes-irreversible` on destroy: a recovery action with real consequences, not
-a retry. If they confirm, afterwards tell them custom-domain DNS needs
-updating and check with `ifhost machines domains list --app <name>`.
+Nothing to do in the common case. Only if the app genuinely existed before and
+had a custom domain, tell the user its DNS now points at a released address and
+check with `ifhost machines domains list --app <name>`.
+
+`--recreate-app` only silences this note. It does not change what happens.
 
 ---
 
