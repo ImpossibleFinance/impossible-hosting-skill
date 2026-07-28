@@ -435,6 +435,7 @@ ifhost deploy [flags]
 | `--app <name>` | Override app name from toml |
 | `--yes` | Skip confirmation prompts |
 | `--json` | Output structured JSON |
+| `--recreate-app` | **Destructive recovery only.** See "Two errors that mean stop" below. Never pass this to clear an error. |
 
 Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
@@ -442,6 +443,49 @@ Drive setup via `exec`/`write`/`console` after deploy.
 **After deploy:** Prints the public URL (e.g.,
 `https://my-app.host.impossi.build`). The application is not live until you
 start it and verify HTTP `200`.
+
+#### Redeploying is safe — the app keeps its address
+
+Deploying again to an app that already exists **reuses** it; the output says
+`Reusing app "<name>"`. The app keeps its network address, so any custom domain
+pointed at it keeps working. Shipping new code never changes an address.
+
+(It does kill any running process — re-run your install and start steps, then
+re-verify the 200.)
+
+#### Two errors that mean stop and ask the user
+
+`ifhost deploy` refuses instead of guessing when creating a new app would be
+destructive. Both are hard stops. Do not work around them, and in particular
+**never invent a different app name to get moving** — that strands the user's
+custom domain on an app nobody deploys to any more.
+
+**1. Existence could not be verified**
+
+```
+could not verify whether app "my-app" exists: API error (500): ...
+  Not creating a new app — a new app would get new addresses and break any
+  custom domain pointing here.
+```
+
+The API errored, so the CLI does not know whether the app exists. This is
+transient. Wait, then re-run the identical command. Never respond by renaming.
+
+**2. The app named in impossible.toml is gone from the server**
+
+```
+App "my-app" is named in impossible.toml but the server returned no record for it.
+...
+  ifhost deploy --app my-app --recreate-app
+```
+
+Recreating makes a **new** app with a **new** address. Any custom domain
+pointing at the old address stops resolving until its DNS is updated by hand.
+
+**Ask the user before passing `--recreate-app`.** Treat it exactly like
+`--yes-irreversible` on destroy: a recovery action with real consequences, not
+a retry. If they confirm, afterwards tell them custom-domain DNS needs
+updating and check with `ifhost machines domains list --app <name>`.
 
 ---
 
