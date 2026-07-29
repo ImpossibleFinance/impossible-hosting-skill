@@ -15,7 +15,7 @@ ordered deployment and recovery procedure.
 
 The platform evolves quickly. Before ANY ifhost work, install the CLI if it is
 missing; otherwise invoking it performs its checksum-verified automatic update.
-Then sync the checksum-verified skill bundle:
+Then sync the latest skill bundle:
 
 ```bash
 command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossi.build/install | sh
@@ -25,8 +25,9 @@ ifhost skill sync
 
 `skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
 paths. If this file was loaded from another path, read those refreshed files
-now and continue from them. If it fails verification, stop and report the
-failure instead of deploying from partially updated instructions.
+now and continue from them. If the sync fails (network, outage), keep working
+from the copy you already have and mention the failed refresh to the user — a
+slightly stale bundle is safe; guessed instructions are not.
 
 Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 `ifhost update` remains available for an explicit update.
