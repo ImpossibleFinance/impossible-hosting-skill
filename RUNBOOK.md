@@ -341,9 +341,10 @@ internal log messages.
 
 The obsolete exec/base64 uploader and its 32 KiB chunks are no longer the
 project-transfer path. Current `push` and non-empty `write` commands use raw,
-verified 8 MiB chunks through an authenticated backend endpoint and Fly SFTP.
-The checksum headers are integrity metadata between the CLI and ifhost
-backend; they are not secrets and are not forwarded to Fly.
+verified 8 MiB chunks through an authenticated backend endpoint, which
+transfers them to the machine. The checksum headers are integrity metadata
+between the CLI and the ifhost backend; they are not secrets and are never
+forwarded beyond it.
 
 Safe recovery is branch-specific:
 
