@@ -636,12 +636,28 @@ the roadmap; for shared state today use a managed database.
 ### ifhost machines domains
 
 ```bash
-ifhost machines domains add myapp.com --app my-app      # Returns CNAME target
+ifhost machines domains add myapp.com --app my-app
+ifhost machines domains check myapp.com --app my-app
 ifhost machines domains list --app my-app
 ifhost machines domains rm myapp.com --app my-app       # Remove custom domain
 ```
 
-After adding, create a DNS CNAME record pointing to the returned target. TLS is automatic.
+DNS requirements are returned by the current platform and may change. Never
+infer a CNAME or copy record values or provider URLs from this skill. Run
+`domains check` and treat its complete Option 1 configuration as authoritative.
+
+Follow the two options printed by `domains check` exactly. Keep the manual
+records visible even when offering the agent-assisted option. For agent-assisted
+setup, find and verify the provider's current official token-creation page; do
+not guess a URL or request a password or global API key. Change only the records
+listed by the command. After all required records are saved, run the printed
+check command once and respect any retry time instead of polling. End the final
+response with the complete configuration and check result requested by the CLI.
+
+If the command cannot identify a DNS provider, do not invent a token workflow.
+Surface its manual configuration and explain that an unpurchased domain must be
+registered first, while an owned domain may need its nameservers configured.
+TLS issuance is automatic after the required records are correct.
 
 ### ifhost machines write / push
 
