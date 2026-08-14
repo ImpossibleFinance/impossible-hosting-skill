@@ -24,7 +24,14 @@ Use the ifhost skill to deploy this project.
 curl -fsSL https://host.impossi.build/install | sh
 ```
 
-Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS and Linux (amd64/arm64).
+Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS, Linux and
+Windows, on both Intel/AMD (x86-64) and ARM.
+
+On Windows, run this in PowerShell instead:
+
+```powershell
+irm https://host.impossi.build/install.ps1 | iex
+```
 The CLI checks hourly, verifies the release checksum, updates atomically, and
 re-runs the requested command. Set `IFHOST_AUTO_UPDATE=0` to pin a version.
 
