@@ -27,6 +27,16 @@ A deployment is complete only when:
   ifhost skill sync
   ```
 
+  On Windows, in PowerShell instead:
+
+  ```powershell
+  if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
+    irm https://host.impossi.build/install.ps1 | iex
+  }
+  ifhost version
+  ifhost skill sync
+  ```
+
 - If `skill sync` prints paths different from the files currently loaded,
   read the refreshed files before continuing. A checksum failure is a hard
   stop; do not use a partially updated bundle.

@@ -23,6 +23,17 @@ ifhost version
 ifhost skill sync
 ```
 
+On Windows, the same three steps in PowerShell — `curl | sh` cannot run
+there:
+
+```powershell
+if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
+  irm https://host.impossi.build/install.ps1 | iex
+}
+ifhost version
+ifhost skill sync
+```
+
 `skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
 paths. If this file was loaded from another path, read those refreshed files
 now and continue from them. If the sync fails (network, outage), keep working
