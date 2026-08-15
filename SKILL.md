@@ -766,7 +766,44 @@ ifhost billing plan                       # Show current plan and usage
 ifhost billing alert set --max 20         # Set spend alert at $20
 ifhost billing alert show                 # Show current alert
 ifhost billing alert off                  # Disable spend alert
+ifhost billing usage                      # Month-to-date traffic per app/site
+ifhost billing topup-traffic 100          # Buy traffic credit (USDC)
 ```
+
+### Traffic: seeing it, and paying before it bites
+
+Every plan includes monthly traffic (100 GB on free and hobby, 500 GB on
+pro, 1024 GB on team). It is an **origin** allowance, and apps and published
+sites draw on the **same pool**. Past it, apps and sites serve a 429 limit
+page instead of content — the site stays up, the content does not.
+
+Check before a launch you expect to spike, not after:
+
+```bash
+ifhost status                             # allowance, used, and any credit
+ifhost billing usage                      # month-to-date, per app and site
+```
+
+If they expect heavy traffic, buy credit ahead of time. It is sold in
+100 GB steps at $0.05/GB, minimum 100 GB, and unused credit never expires:
+
+```bash
+export IFHOST_TOPUP_SIGNING_KEY=<hex private key of the paying wallet>
+ifhost billing topup-traffic 100          # 100 GB for $5.00
+```
+
+Without the signing key, `--json` prints the raw payment challenge so an
+agent can drive its own payment loop. In the dashboard the same controls
+live at `/dashboard/app` under the plan card.
+
+**Two things worth knowing before you diagnose a 429:**
+
+- The only warning before a block is an amber note in the dashboard at 80%.
+  There is no email and no CLI warning, so a customer who does not open the
+  dashboard gets no notice at all.
+- Sites also have a **per-day** ceiling separate from the monthly pool.
+  A 429 from that one is not fixed by buying traffic credit — check
+  `ifhost status` to see which limit was hit before recommending a purchase.
 
 `subscribe` opens a hosted checkout page (pick card or crypto there). Card
 payments are coming soon; crypto (USDC) works today. `--pay crypto` is a
