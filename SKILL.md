@@ -915,7 +915,124 @@ ifhost machines console input --app my-project $SID "git clone ... /data/app && 
 
 ---
 
+## Ready-made agents (`ifhost agents`)
+
+Separate from deploying your own code, ifhost hosts **ready-made AI agents**
+from a catalog. One of these is not an app you write: it is an agent that
+gets its own machine, its own storage and its own control panel, and talks
+to its owner in a chat app (Telegram, Discord, WhatsApp). You spawn it and
+hand it over.
+
+Use this when the user asks for "an AI assistant / a chatbot I can message"
+rather than for a website or an API. Everything else in this document is
+about `ifhost deploy`, which is a different product surface.
+
+### First: read what the catalog actually asks
+
+```bash
+ifhost agents list            # names, one line each
+ifhost agents list --json     # THE source of truth for every flag name below
+```
+
+`--json` is what you read before spawning. It carries, per agent:
+
+- `selections[].id` and each `options[].id` — the values for `--choose`
+- `inputs[].key` — the values for `--set` / `--set-from-env`
+- `inputs[].steps[]` — where the owner gets each key, in their own words
+- `selections[].requires` — a question that only applies to another answer
+
+Never hardcode these names from this document or from memory. Recipes gain
+providers, models and channels without warning; the JSON is current and this
+page is not.
+
+### Spawning, when the owner is present (default, preferred)
+
+```bash
+ifhost agents spawn hermes --name my-assistant
+```
+
+This prints a one-time setup link and waits. The owner opens it on any
+device and pastes their own keys straight into encrypted storage.
+
+**Prefer this.** The keys are the owner's — their AI provider account, their
+bot token, their bill. When you take the default path, you never hold them,
+they never enter your context, and they cannot end up in a transcript or a
+log. Send the link to the user and wait.
+
+### Spawning unattended (no browser, no terminal)
+
+When you are the key holder — the keys are already in your environment, or
+the user handed them to you deliberately — spawn without a person present:
+
+```bash
+ifhost agents spawn hermes --name my-assistant \
+  --choose channel=telegram \
+  --choose llm=openai \
+  --choose openai-model=other \
+  --set-from-env TELEGRAM_BOT_TOKEN \
+  --set-from-env OPENAI_API_KEY \
+  --set OPENAI_MODEL=gpt-5-mini
+```
+
+- `--choose <question>=<answer>` answers a setup question. Repeatable.
+- `--set-from-env KEY` supplies a value by naming the environment variable
+  holding it. **Prefer this for every secret**: a value passed with `--set`
+  is visible to every process on the machine and lands in shell history.
+- `--set KEY=value` supplies a value directly. Fine for non-secrets like a
+  model name.
+- `--extra KEY=value` sets an optional integration variable, when the agent
+  offers an extras section. It needs a submission to ride along with, so use
+  it alongside the answers above (or with `--type-here`); on the default
+  browser path the owner sets extras in the form and the flag is refused
+  rather than quietly dropped.
+
+Any of `--choose` / `--set` / `--set-from-env` switches spawn to this path.
+It never prompts and never needs a terminal.
+
+**Refusals are complete.** If something is missing, the command names every
+remaining key, its title and where the owner gets it — so you can fix it in
+one more command rather than guessing. A wrong question name or a value for
+a question that was not asked is rejected by name, at the terminal, before
+anything is built.
+
+`--type-here` is the third path: interactive prompts in this terminal. It
+needs a real TTY and is for humans who prefer typing; do not use it.
+
+### After it is spawned
+
+```bash
+ifhost agents status                    # all your agents
+ifhost agents status my-assistant       # one agent, with its verify result
+ifhost agents reconfigure my-assistant  # change model, keys or channel
+ifhost agents panel my-assistant --private   # take the control panel off the web
+ifhost agents panel my-assistant --public    # put it back
+ifhost agents destroy my-assistant --yes-irreversible
+```
+
+Spawn is not finished when the machine boots. The platform runs the recipe's
+own verify probe — it asks the agent a real question and waits for a real
+answer — and only then reports `running`. `spawn` already waits for that, so
+its success means the agent genuinely replied, not merely that a machine
+exists. Treat `verify-failed` as "a key was rejected", not as a crash.
+
+### Traps
+
+| Trap | What happens | What to do |
+|------|--------------|------------|
+| Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone. It cannot be finished headlessly — the owner must open the control panel and scan. |
+| Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. |
+| Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `ifhost agents list --json`. |
+| Assuming a free spawn is permanent | The agent disappears | On the free tier a spawned agent carries a removal deadline. `spawn` prints it before setup starts — relay that notice to the user rather than restating a number from here. |
+| Supplying two providers | The API rejects the whole submission | Answer the provider question once and supply only that provider's key. |
+
+---
+
 ## Agent Decision Tree
+
+**First fork: is the user asking for an app, or for an assistant?** A
+website, API or bot they wrote is `ifhost deploy`, below. "An AI I can
+message" is a catalog agent — see *Ready-made agents* above, and do not
+build one by hand.
 
 ```
 ifhost deploy (runner VM with a default 1 GB /data volume), then:
