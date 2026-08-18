@@ -998,6 +998,27 @@ anything is built.
 `--type-here` is the third path: interactive prompts in this terminal. It
 needs a real TTY and is for humans who prefer typing; do not use it.
 
+### Linking WhatsApp
+
+WhatsApp carries no key to paste — the owner links an account they already
+have by scanning a code with their phone. That step needs a human with a
+phone, but everything around it works from the terminal:
+
+```bash
+ifhost agents whatsapp pair my-assistant     # prints a scannable QR, waits, switches the agent on
+```
+
+Codes expire every few seconds; the command draws fresh ones and starts a
+new session by itself if one lapses, so leave it running while the phone is
+found. On the phone: WhatsApp → Settings → Linked devices → Link a device.
+
+Until a scan lands, a WhatsApp agent is up but not listening — its gateway
+stays down by design while WhatsApp is selected and unpaired. That is not a
+failure: `spawn` completes, status reaches `running`, and the verify result
+says "WhatsApp isn't linked yet" as a warning. You can scan later, scan a
+different number, or move the agent to another channel with `reconfigure`,
+and it keeps everything it remembers either way.
+
 ### After it is spawned
 
 ```bash
