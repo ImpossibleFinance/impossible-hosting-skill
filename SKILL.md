@@ -1134,9 +1134,8 @@ ifhost describe --app my-app --json | jq '.deployments[0]'
 ## Pricing
 
 Prices, pool sizes and limits are NOT written here. They change, and a copy in
-this file is a copy that goes stale — this section advertised a 256 MB free RAM
-pool long after the catalog moved to 1 GB, and told agents Team had unlimited
-custom domains when it is capped.
+this file goes stale unnoticed: this section once understated a plan's RAM pool
+for weeks after the catalog moved, and called a capped limit unlimited.
 
 Read them live instead, from the source the biller itself uses:
 
