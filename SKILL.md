@@ -772,9 +772,9 @@ ifhost billing topup-traffic 100          # Buy traffic credit (USDC)
 
 ### Traffic: seeing it, and paying before it bites
 
-Every plan includes monthly traffic (100 GB on free and hobby, 500 GB on
-pro, 1024 GB on team). It is an **origin** allowance, and apps and published
-sites draw on the **same pool**. Past it, apps and sites serve a 429 limit
+Every plan includes a monthly traffic allowance — read the account's own from
+`ifhost status`, never from memory. It is an **origin** allowance, and apps and
+published sites draw on the **same pool**. Past it, apps and sites serve a 429 limit
 page instead of content — the site stays up, the content does not.
 
 Check before a launch you expect to spike, not after:
@@ -784,12 +784,14 @@ ifhost status                             # allowance, used, and any credit
 ifhost billing usage                      # month-to-date, per app and site
 ```
 
-If they expect heavy traffic, buy credit ahead of time. It is sold in
-100 GB steps at $0.05/GB, minimum 100 GB, and unused credit never expires:
+If they expect heavy traffic, buy credit ahead of time; unused credit never
+expires. The rate, the step size and the minimum are printed by the command
+itself — run its help rather than quoting a price:
 
 ```bash
+ifhost billing topup-traffic --help       # current rate, minimum, and step size
 export IFHOST_TOPUP_SIGNING_KEY=<hex private key of the paying wallet>
-ifhost billing topup-traffic 100          # 100 GB for $5.00
+ifhost billing topup-traffic <GB>         # cost is quoted before it charges
 ```
 
 Without the signing key, `--json` prints the raw payment challenge so an
@@ -1131,12 +1133,20 @@ ifhost describe --app my-app --json | jq '.deployments[0]'
 
 ## Pricing
 
-| Plan | Price | RAM Pool | Volume Pool | Custom Domains |
-|------|-------|----------|-------------|----------------|
-| Free | $0/mo | 256 MB | 1 GB | 0 |
-| Hobby | $15/mo | 2 GB | 5 GB | 3 |
-| Pro | $49/mo | 8 GB | 20 GB | 10 |
-| Team | $149/mo | 24 GB | 50 GB | unlimited |
+Prices, pool sizes and limits are NOT written here. They change, and a copy in
+this file is a copy that goes stale — this section advertised a 256 MB free RAM
+pool long after the catalog moved to 1 GB, and told agents Team had unlimited
+custom domains when it is capped.
+
+Read them live instead, from the source the biller itself uses:
+
+```bash
+curl -s https://host.impossi.build/billing/plans          # every plan, no auth needed
+ifhost status                                              # the signed-in account's plan and usage
+curl -s https://host.impossi.build/llms.txt                # agent guide, pricing block rendered from the catalog
+```
+
+Quote the account's own plan from `ifhost status`, never a remembered number.
 
 Upgrade: `ifhost billing subscribe <plan>` (or `ifhost sub subscribe <plan>`)
 
