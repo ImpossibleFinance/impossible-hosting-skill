@@ -945,6 +945,21 @@ Never hardcode these names from this document or from memory. Recipes gain
 providers, models and channels without warning; the JSON is current and this
 page is not.
 
+### Names are global, and two refusals mean different things
+
+An agent's name is its permanent address and is unique across the whole
+platform, so `spawn` can refuse for two opposite reasons:
+
+- `agent_name_yours` — you already have one by that name. Spawning again
+  resumes that setup where it stopped; the refusal says what state it is in.
+  Remove it instead with `ifhost agents destroy <name> --yes-irreversible`.
+- `agent_name_taken` — the name belongs to another account. Nothing you can
+  do but pick a different one.
+
+Spawning in a loop or in CI, use a name that carries the run into it
+(`ci-wa-<run-id>`) and destroy it in a step that always runs. A fixed name
+collides with your own leftover from the previous run.
+
 ### Spawning, when the owner is present (default, preferred)
 
 ```bash
