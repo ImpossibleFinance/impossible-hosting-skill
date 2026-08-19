@@ -922,7 +922,8 @@ ifhost machines console input --app my-project $SID "git clone ... /data/app && 
 Separate from deploying your own code, ifhost hosts **ready-made AI agents**
 from a catalog. One of these is not an app you write: it is an agent that
 gets its own machine, its own storage and its own control panel, and talks
-to its owner in a chat app (Telegram, Discord, WhatsApp). You spawn it and
+to its owner in a chat app — Telegram, Discord, and on hermes also
+WhatsApp; each recipe names its own channels. You spawn it and
 hand it over.
 
 Use this when the user asks for "an AI assistant / a chatbot I can message"
@@ -972,6 +973,8 @@ ifhost agents spawn openclaw --name my-claw
 
 This prints a one-time setup link and waits. The owner opens it on any
 device and pastes their own keys straight into encrypted storage.
+OpenClaw is the larger of the two — if the plan's pool doesn't fit it,
+`spawn` says so before anything starts, so nothing is half-created.
 
 **Prefer this.** The keys are the owner's — their AI provider account, their
 bot token, their bill. When you take the default path, you never hold them,
@@ -1017,7 +1020,11 @@ anything is built.
 `--type-here` is the third path: interactive prompts in this terminal. It
 needs a real TTY and is for humans who prefer typing; do not use it.
 
-### Linking WhatsApp
+### Linking WhatsApp (hermes)
+
+Only for agents whose recipe offers the WhatsApp channel — today that is
+hermes. An agent spawned without it has nothing to link, and the API says
+so plainly rather than pretending a code is coming.
 
 WhatsApp carries no key to paste — the owner links an account they already
 have by scanning a code with their phone. That step needs a human with a
@@ -1062,8 +1069,8 @@ exists. Treat `verify-failed` as "a key was rejected", not as a crash.
 | Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone. It cannot be finished headlessly — the owner must open the control panel and scan. |
 | Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. |
 | Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner asks their agent in chat. |
-| One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --local --prompt "..."`. |
-| Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | OpenClaw only runs models its own build knows. `openclaw models list --provider <id>` inside the agent is the truth; a newer name from a provider's public list may not be in it yet. |
+| One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy agent's model unknown. |
+| Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | Model names resolve through the agent's own gateway. `openclaw models list --provider <id>` inside the agent shows what it accepts right now; a newer name from a provider's public list may not be there yet. |
 | Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `ifhost agents list --json`. |
 | Assuming a free spawn is permanent | The agent disappears | On the free tier a spawned agent carries a removal deadline. `spawn` prints it before setup starts — relay that notice to the user rather than restating a number from here. |
 | Supplying two providers | The API rejects the whole submission | Answer the provider question once and supply only that provider's key. |
