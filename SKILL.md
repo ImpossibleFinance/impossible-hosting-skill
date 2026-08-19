@@ -965,7 +965,9 @@ collides with your own leftover from the previous run.
 ### Spawning, when the owner is present (default, preferred)
 
 ```bash
+ifhost agents list                       # what's spawnable today — hermes and openclaw, and growing
 ifhost agents spawn hermes --name my-assistant
+ifhost agents spawn openclaw --name my-claw
 ```
 
 This prints a one-time setup link and waits. The owner opens it on any
@@ -1059,6 +1061,9 @@ exists. Treat `verify-failed` as "a key was rejected", not as a crash.
 |------|--------------|------------|
 | Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone. It cannot be finished headlessly — the owner must open the control panel and scan. |
 | Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. |
+| Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner asks their agent in chat. |
+| One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --local --prompt "..."`. |
+| Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | OpenClaw only runs models its own build knows. `openclaw models list --provider <id>` inside the agent is the truth; a newer name from a provider's public list may not be in it yet. |
 | Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `ifhost agents list --json`. |
 | Assuming a free spawn is permanent | The agent disappears | On the free tier a spawned agent carries a removal deadline. `spawn` prints it before setup starts — relay that notice to the user rather than restating a number from here. |
 | Supplying two providers | The API rejects the whole submission | Answer the provider question once and supply only that provider's key. |
