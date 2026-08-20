@@ -1038,13 +1038,17 @@ Codes expire every few seconds; the command draws fresh ones and starts a
 new session by itself if one lapses, so leave it running while the phone is
 found. On the phone: WhatsApp → Settings → Linked devices → Link a device.
 
-If it stops with **"WhatsApp linking is not responding on this agent"**, the
-agent is fine — its gateway's WhatsApp connection has wedged, which it can do
-without affecting anything else. Restart it with `ifhost agents reconfigure
-<name>` (which keeps everything it remembers) and run the pair command again.
-Do NOT destroy and respawn the agent for this, and do not report the spawn as
-failed. The command only says this after trying three fresh sessions, so it is
-a real condition rather than a slow network.
+A code that sits unchanged for a few minutes gets replaced automatically, and
+the command says so ("getting a fresh one"). That is routine: a healthy session
+was measured holding one code for sixty-six seconds while its socket was
+replaced underneath, so an unchanged code proves nothing on its own.
+
+If the command reaches its deadline it says no scan landed and names both
+possibilities, because they cannot be told apart from outside: either nobody
+scanned, or a scan did land and the session had already gone. If the owner says
+they DID scan, restart the agent with `ifhost agents reconfigure <name>` — which
+keeps everything it remembers — and run the pair command again. Do NOT destroy
+and respawn the agent for this, and do not report the spawn as failed.
 
 Until a scan lands, a WhatsApp agent is up but not listening. That is not a
 failure: `spawn` completes, status reaches `running`, and the verify result
