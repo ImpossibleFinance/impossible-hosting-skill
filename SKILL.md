@@ -18,7 +18,7 @@ missing; otherwise invoking it performs its checksum-verified automatic update.
 Then sync the latest skill bundle:
 
 ```bash
-command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossi.build/install | sh
+command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossibuild.ai/install | sh
 ifhost version
 ifhost skill sync
 ```
@@ -28,7 +28,7 @@ there:
 
 ```powershell
 if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-  irm https://host.impossi.build/install.ps1 | iex
+  irm https://host.impossibuild.ai/install.ps1 | iex
 }
 ifhost version
 ifhost skill sync
@@ -51,7 +51,7 @@ ready — your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
    `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
-2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossi.build/`
+2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossibuild.ai/`
    printed `200` (or the app's health endpoint did)
 
 Until then, NEVER tell the user "deployed", "live", or "running" — a
@@ -213,7 +213,7 @@ Implications for you as the agent driving the deploy:
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
-**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossi.build/healthz` returns 200
+**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossibuild.ai/healthz` returns 200
 (or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
 WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
 APP's problem, not the deploy.
@@ -248,7 +248,7 @@ flags. Do not infer runner lifecycle from generic examples in help output:
 ## Install / Update
 
 ```bash
-curl -fsSL https://host.impossi.build/install | sh
+curl -fsSL https://host.impossibuild.ai/install | sh
 ```
 
 Run this at the start of EVERY session, not just the first (Rule 0) — it
@@ -270,19 +270,19 @@ If the install script fails (e.g., no curl, restricted network), manually downlo
 
 ```bash
 # macOS ARM (Apple Silicon)
-curl -fsSL https://host.impossi.build/dl/ifhost_darwin_arm64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_arm64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # macOS Intel
-curl -fsSL https://host.impossi.build/dl/ifhost_darwin_amd64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_amd64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # Linux x86_64
-curl -fsSL https://host.impossi.build/dl/ifhost_linux_amd64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_amd64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # Linux ARM64
-curl -fsSL https://host.impossi.build/dl/ifhost_linux_arm64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_arm64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 ```
 
@@ -344,7 +344,7 @@ ifhost machines install --app my-site python3
 printf '%s\n' 'state/data.db' > .ifhost-state-paths  # only when the app owns this runtime path
 ifhost machines push ./ --to /data/app --app my-site --yes-replace
 ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossi.build/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossibuild.ai/   # must print 200
 ```
 
 **Gotchas that burn tokens on runner deploys (learned the hard way):**
@@ -389,13 +389,13 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://my-api.host.impossi.build
+    URL:     https://my-api.host.impossibuild.ai
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
 
   my-site
-    URL:     https://my-site.host.impossi.build
+    URL:     https://my-site.host.impossibuild.ai
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -415,7 +415,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--app` | (required) | App name — becomes `<name>.host.impossi.build` |
+| `--app` | (required) | App name — becomes `<name>.host.impossibuild.ai` |
 | `--port` | 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
@@ -453,7 +453,7 @@ Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
 
 **After deploy:** Prints the public URL (e.g.,
-`https://my-app.host.impossi.build`). The application is not live until you
+`https://my-app.host.impossibuild.ai`). The application is not live until you
 start it and verify HTTP `200`.
 
 #### Redeploying is safe — the app keeps its address
@@ -863,7 +863,7 @@ ifhost machines install --app my-api curl git nodejs npm
 ifhost machines push ./ --to /data/app --app my-api --yes-replace
 ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
 ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossi.build/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossibuild.ai/   # must print 200
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)
@@ -1158,9 +1158,9 @@ for weeks after the catalog moved, and called a capped limit unlimited.
 Read them live instead, from the source the biller itself uses:
 
 ```bash
-curl -s https://host.impossi.build/billing/plans          # every plan, no auth needed
+curl -s https://host.impossibuild.ai/billing/plans        # every plan, no auth needed
 ifhost status                                              # the signed-in account's plan and usage
-curl -s https://host.impossi.build/llms.txt                # agent guide, pricing block rendered from the catalog
+curl -s https://host.impossibuild.ai/llms.txt              # agent guide, pricing block rendered from the catalog
 ```
 
 Quote the account's own plan from `ifhost status`, never a remembered number.

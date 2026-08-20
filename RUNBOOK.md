@@ -22,7 +22,7 @@ A deployment is complete only when:
   verified skill bundle before every deployment session:
 
   ```bash
-  command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossi.build/install | sh
+  command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossibuild.ai/install | sh
   ifhost version
   ifhost skill sync
   ```
@@ -31,7 +31,7 @@ A deployment is complete only when:
 
   ```powershell
   if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-    irm https://host.impossi.build/install.ps1 | iex
+    irm https://host.impossibuild.ai/install.ps1 | iex
   }
   ifhost version
   ifhost skill sync
@@ -310,17 +310,17 @@ Test the health or root route first:
 curl -sS -o /dev/null \
   -w "%{http_code} %{content_type} %{size_download}\n" \
   --max-time 30 \
-  https://<app-name>.host.impossi.build/
+  https://<app-name>.host.impossibuild.ai/
 ```
 
 Then test representative routes and important assets:
 
 ```bash
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 30 \
-  https://<app-name>.host.impossi.build/docs/
+  https://<app-name>.host.impossibuild.ai/docs/
 
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 30 \
-  https://<app-name>.host.impossi.build/assets/app.js
+  https://<app-name>.host.impossibuild.ai/assets/app.js
 ```
 
 For a static site, verify at least:
