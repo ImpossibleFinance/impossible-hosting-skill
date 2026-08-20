@@ -1038,6 +1038,14 @@ Codes expire every few seconds; the command draws fresh ones and starts a
 new session by itself if one lapses, so leave it running while the phone is
 found. On the phone: WhatsApp → Settings → Linked devices → Link a device.
 
+If it stops with **"WhatsApp linking is not responding on this agent"**, the
+agent is fine — its gateway's WhatsApp connection has wedged, which it can do
+without affecting anything else. Restart it with `ifhost agents reconfigure
+<name>` (which keeps everything it remembers) and run the pair command again.
+Do NOT destroy and respawn the agent for this, and do not report the spawn as
+failed. The command only says this after trying three fresh sessions, so it is
+a real condition rather than a slow network.
+
 Until a scan lands, a WhatsApp agent is up but not listening. That is not a
 failure: `spawn` completes, status reaches `running`, and the verify result
 says "WhatsApp isn't linked yet" as a warning. You can scan later, scan a
