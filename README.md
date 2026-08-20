@@ -1,6 +1,6 @@
 # ifhost Deployment Skill
 
-A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code) that teaches AI agents how to deploy apps using [Impossible Hosting](https://host.impossi.build).
+A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code) that teaches AI agents how to deploy apps using [Impossible Hosting](https://host.impossibuild.ai).
 
 ## Usage
 
@@ -21,7 +21,7 @@ Use the ifhost skill to deploy this project.
 ## Install the CLI
 
 ```bash
-curl -fsSL https://host.impossi.build/install | sh
+curl -fsSL https://host.impossibuild.ai/install | sh
 ```
 
 Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS, Linux and
@@ -30,7 +30,7 @@ Windows, on both Intel/AMD (x86-64) and ARM.
 On Windows, run this in PowerShell instead:
 
 ```powershell
-irm https://host.impossi.build/install.ps1 | iex
+irm https://host.impossibuild.ai/install.ps1 | iex
 ```
 The CLI checks hourly, verifies the release checksum, updates atomically, and
 re-runs the requested command. Set `IFHOST_AUTO_UPDATE=0` to pin a version.
@@ -48,19 +48,19 @@ If the script fails, download directly:
 
 ```bash
 # macOS ARM (Apple Silicon)
-curl -fsSL https://host.impossi.build/dl/ifhost_darwin_arm64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_arm64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # macOS Intel
-curl -fsSL https://host.impossi.build/dl/ifhost_darwin_amd64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_amd64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # Linux x86_64
-curl -fsSL https://host.impossi.build/dl/ifhost_linux_amd64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_amd64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 
 # Linux ARM64
-curl -fsSL https://host.impossi.build/dl/ifhost_linux_arm64.tar.gz | tar xz
+curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_arm64.tar.gz | tar xz
 mv ifhost ~/.local/bin/
 ```
 
@@ -91,12 +91,12 @@ Agent: I'll deploy using ifhost.
 $ ifhost init --app my-api --port 3000 --memory 512
 $ ifhost deploy --env DATABASE_URL=postgres://...
 
-Deployed! Live at: https://my-api.host.impossi.build
+Deployed! Live at: https://my-api.host.impossibuild.ai
 ```
 
 ## Links
 
 - [ifhost CLI](https://github.com/ImpossibleFinance/impossible-hosting)
 - [Runner deployment runbook](./RUNBOOK.md)
-- [Docs](https://host.impossi.build/docs)
-- [llm.txt](https://host.impossi.build/llm.txt)
+- [Docs](https://host.impossibuild.ai/docs)
+- [llm.txt](https://host.impossibuild.ai/llm.txt)
