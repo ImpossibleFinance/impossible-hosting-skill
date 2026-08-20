@@ -1070,6 +1070,24 @@ ifhost agents status                    # all your agents
 ifhost agents status my-assistant       # one agent, with its verify result
 ifhost agents logs my-assistant         # its recent log, credentials redacted
 ifhost agents logs my-assistant --lines 500
+
+**One line in that log looks like a break and is not.** Shortly after an agent
+starts you will see:
+
+```
+[ws] unauthorized ... reason=password_mismatch
+[ws] closed before connect ... code=1008 reason=unauthorized: gateway password mismatch
+```
+
+That is the platform's own checkup trying a WRONG password against the agent's
+control panel and requiring it to be refused. The panel faces the internet and
+its sign-in is the only thing guarding it, so the check proves the door is shut
+by walking into it. A successful `health` line a few seconds earlier is the same
+checkup getting in with the RIGHT password — seeing both, in that order, means
+the panel is working correctly.
+
+Do not report this as a fault, do not tell the owner to reset anything, and do
+not rebuild the agent over it.
 ifhost agents reconfigure my-assistant  # change model, keys or channel
 ifhost agents panel my-assistant --private   # take the control panel off the web
 ifhost agents panel my-assistant --public    # put it back
