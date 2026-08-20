@@ -1056,6 +1056,9 @@ so an agent nobody has scanned is an agent nobody can talk to.
 ```bash
 ifhost agents status                    # all your agents
 ifhost agents status my-assistant       # one agent, with its verify result
+ifhost agents status my-assistant --show-password   # the control panel sign-in
+ifhost agents logs my-assistant         # its recent log, credentials redacted
+ifhost agents logs my-assistant --lines 500
 ifhost agents reconfigure my-assistant  # change model, keys or channel
 ifhost agents panel my-assistant --private   # take the control panel off the web
 ifhost agents panel my-assistant --public    # put it back
@@ -1073,6 +1076,7 @@ exists. Treat `verify-failed` as "a key was rejected", not as a crash.
 | Trap | What happens | What to do |
 |------|--------------|------------|
 | Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `ifhost agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
+| The agent is slow, or answered nothing | You cannot tell whether it is thinking, stuck, or never received the message | `ifhost agents logs <agent>` reads its recent log with anything credential-shaped redacted. Measured 2026-08-20 on a healthy agent: a chat message through the control panel came back in ~3.5s, while the SAME agent on Telegram took 11-19s, and one message in five got no reply at all. So slowness on a messaging channel is not evidence of a broken agent, and "it never replied" is a real thing that happens — check the log before rebuilding anything. |
 | Getting the panel password | The owner cannot open their own control panel | Ask the platform, not the agent: `ifhost agents status <agent> --show-password`. It is stored when the agent is built, so this works whether or not the agent is running or its model is configured. Telling the owner to ask the agent in chat used to be the advice and could not work when it mattered: a WhatsApp agent has no chat until it is linked, and linking happens on that very panel. |
 | The panel refuses the first browser | "pairing required: device is not approved yet" | Only for agents whose panel asks each device for approval — `ifhost agents status <agent>` says which those are, and most recipes do not. For those that do, this is expected exactly once: the approval cannot exist until a browser has knocked, so the first load is refused and the agent admits it a moment later. Wait a couple of seconds and reload. A second computer or phone needs `ifhost agents panel <agent> --approve`. On a panel that does NOT ask for device approval, a refusal or a blank page is a real fault — do not wait it out. |
 | Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner asks their agent in chat. |
