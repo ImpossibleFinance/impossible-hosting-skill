@@ -1020,10 +1020,10 @@ anything is built.
 `--type-here` is the third path: interactive prompts in this terminal. It
 needs a real TTY and is for humans who prefer typing; do not use it.
 
-### Linking WhatsApp (hermes)
+### Linking WhatsApp
 
-Only for agents whose recipe offers the WhatsApp channel — today that is
-hermes. An agent spawned without it has nothing to link, and the API says
+Only for agents whose recipe offers the WhatsApp channel — today hermes and
+openclaw. An agent spawned without it has nothing to link, and the API says
 so plainly rather than pretending a code is coming.
 
 WhatsApp carries no key to paste — the owner links an account they already
@@ -1038,12 +1038,18 @@ Codes expire every few seconds; the command draws fresh ones and starts a
 new session by itself if one lapses, so leave it running while the phone is
 found. On the phone: WhatsApp → Settings → Linked devices → Link a device.
 
-Until a scan lands, a WhatsApp agent is up but not listening — its gateway
-stays down by design while WhatsApp is selected and unpaired. That is not a
+Until a scan lands, a WhatsApp agent is up but not listening. That is not a
 failure: `spawn` completes, status reaches `running`, and the verify result
 says "WhatsApp isn't linked yet" as a warning. You can scan later, scan a
 different number, or move the agent to another channel with `reconfigure`,
 and it keeps everything it remembers either way.
+
+What "up but not listening" means differs by recipe, and neither is a fault
+to chase. Hermes keeps its gateway DOWN while WhatsApp is selected and
+unpaired, so the scan is what starts it. OpenClaw runs normally with the
+channel switched on and simply unlinked, and it answers nobody until the
+scan says who its owner is — its allowlist is deliberately empty until then,
+so an agent nobody has scanned is an agent nobody can talk to.
 
 ### After it is spawned
 
@@ -1066,7 +1072,7 @@ exists. Treat `verify-failed` as "a key was rejected", not as a crash.
 
 | Trap | What happens | What to do |
 |------|--------------|------------|
-| Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone. It cannot be finished headlessly — the owner must open the control panel and scan. |
+| Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `ifhost agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
 | Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. |
 | Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner asks their agent in chat. |
 | One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy agent's model unknown. |
