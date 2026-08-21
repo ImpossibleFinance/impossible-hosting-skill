@@ -1113,7 +1113,7 @@ exists. Treat `verify-failed` as "a key was rejected", not as a crash.
 | One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy agent's model unknown. |
 | Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | Model names resolve through the agent's own gateway. `openclaw models list --provider <id>` inside the agent shows what it accepts right now; a newer name from a provider's public list may not be there yet. |
 | Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `ifhost agents list --json`. |
-| Assuming a free spawn is permanent | The agent disappears | On the free tier a spawned agent carries a removal deadline. `spawn` prints it before setup starts — relay that notice to the user rather than restating a number from here. |
+| Assuming a free spawn is permanent | The agent disappears | An agent successfully spawned on Free carries a destruction timestamp. `spawn` prints the server's current destruction notice before setup starts — relay that notice. If the exact time matters, run `ifhost agents status <name> --json` and read `expires_at`; never copy a duration into this skill. |
 | Supplying two providers | The API rejects the whole submission | Answer the provider question once and supply only that provider's key. |
 
 ---
