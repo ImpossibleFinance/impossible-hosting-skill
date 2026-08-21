@@ -289,7 +289,7 @@ mv ifhost ~/.local/bin/
 ## Quick Start
 
 ```bash
-ifhost login                                          # Google OAuth (one-time)
+ifhost login                                          # Browser device authorization (one-time)
 ifhost init --app my-app --port 3000 --memory 512 --storage local
 ifhost deploy                                         # Provision the runner
 # Then install, transfer to /data/app, start, and verify an HTTP 200.
@@ -366,7 +366,13 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impos
 
 ### ifhost login
 
-Authenticate via Google OAuth. Opens a browser (PKCE flow). Credentials are stored at `~/.impossible/credentials.json`. If already logged in, skips the flow.
+Authenticate through browser device authorization. The CLI prints a short
+sign-in code, opens the approval page, and polls until you approve it. The
+approval page can be opened on any browser-capable device; it does not need a
+browser or loopback listener on the machine running `ifhost`. Sign in through
+the providers configured in the dashboard, verify the displayed machine, and
+approve it. Credentials are stored at `~/.impossible/credentials.json`. If
+already logged in, the account picker still lets you switch or add an account.
 
 | Flag | Description |
 |------|-------------|
