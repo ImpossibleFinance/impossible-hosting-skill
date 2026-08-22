@@ -376,7 +376,8 @@ already logged in, the account picker still lets you switch or add an account.
 
 | Flag | Description |
 |------|-------------|
-| `--token <token>` | Use an API token directly (for CI/agent use — no browser needed) |
+| `--token <token>` | Use an API token directly (for CI/agent use — no browser needed). `--token -` reads it from stdin |
+| `--from-file <path>` | Read the token from a file (`-` = stdin) — avoids shell history and `ps` exposure |
 | `--switch` | Switch between existing accounts |
 
 ### ifhost logout
@@ -739,7 +740,7 @@ ifhost tokens list                       # List all API tokens
 ifhost tokens revoke <token-id>          # Revoke a token
 ```
 
-Use tokens for CI pipelines or agent auth: `ifhost login --token <token>`.
+Use tokens for CI pipelines or agent auth: `ifhost login --token <token>`. In CI, prefer the non-argv forms so the token never lands in shell history or `ps` output: `ifhost login --token -` (stdin) or `ifhost login --from-file token.txt`. `ifhost secrets set` accepts the same `--from-file`/stdin convention for values.
 
 ### ifhost auth
 
