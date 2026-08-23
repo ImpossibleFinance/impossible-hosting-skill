@@ -376,8 +376,8 @@ already logged in, the account picker still lets you switch or add an account.
 
 | Flag | Description |
 |------|-------------|
-| `--token <token>` | Use an API token directly (for CI/agent use — no browser needed). `--token -` reads it from stdin |
-| `--from-file <path>` | Read the token from a file (`-` = stdin) — avoids shell history and `ps` exposure |
+| `--token <token>` | Use an API token directly (legacy; the value is visible in argv). Prefer `--token -`, which reads it from stdin |
+| `--from-file <path>` | Read the token from a local secret file (`-` = stdin) — avoids shell history and `ps` exposure |
 | `--switch` | Switch between existing accounts |
 
 ### ifhost logout
@@ -740,7 +740,18 @@ ifhost tokens list                       # List all API tokens
 ifhost tokens revoke <token-id>          # Revoke a token
 ```
 
-Use tokens for CI pipelines or agent auth: `ifhost login --token <token>`. In CI, prefer the non-argv forms so the token never lands in shell history or `ps` output: `ifhost login --token -` (stdin) or `ifhost login --from-file token.txt`. `ifhost secrets set` accepts the same `--from-file`/stdin convention for values.
+Use tokens for CI pipelines or agent auth without putting the credential in an
+argument:
+
+```bash
+printf '%s' "$IFHOST_TOKEN" | ifhost login --token -
+ifhost login --from-file /run/secrets/ifhost-token
+```
+
+`ifhost machines secrets set` also accepts `--from-file -` on stdin or a local
+file containing `KEY=VALUE` pairs. Only values are sent to the platform; the
+file itself stays local. Keep local secret files access-restricted and remove
+temporary copies after use.
 
 ### ifhost auth
 
