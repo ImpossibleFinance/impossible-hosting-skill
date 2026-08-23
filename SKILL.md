@@ -350,7 +350,7 @@ ifhost machines install --app my-site python3
 printf '%s\n' 'state/data.db' > .ifhost-state-paths  # only when the app owns this runtime path
 ifhost machines push ./ --to /data/app --app my-site --yes-replace
 ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossi.build/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossibuild.ai/   # must print 200
 ```
 
 **Gotchas that burn tokens on runner deploys (learned the hard way):**
@@ -402,13 +402,13 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://my-api.host.impossi.build
+    URL:     https://my-api.host.impossibuild.ai
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
 
   my-site
-    URL:     https://my-site.host.impossi.build
+    URL:     https://my-site.host.impossibuild.ai
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -466,7 +466,7 @@ Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
 
 **After deploy:** Prints the public URL (e.g.,
-`https://my-app.host.impossi.build`). The application is not live until you
+`https://my-app.host.impossibuild.ai`). The application is not live until you
 start it and verify HTTP `200`.
 
 #### Redeploying is safe — the app keeps its address
@@ -780,6 +780,12 @@ ifhost version                           # Show CLI version and check for update
 ifhost update                            # Update CLI to the latest version
 ```
 
+Automatic-check failures are recorded in
+`~/.impossible/update-check.json` while the requested command continues. Set
+`IFHOST_AUTO_UPDATE_DEBUG=1` when you need the same failure on stderr; never
+treat a quiet background check as proof that an update was available or
+installed.
+
 ### ifhost billing (alias: sub)
 
 ```bash
@@ -816,7 +822,7 @@ itself — run its help rather than quoting a price:
 
 ```bash
 ifhost billing topup-traffic --help       # current rate, minimum, and step size
-export IFHOST_TOPUP_SIGNING_KEY=<hex private key of the paying wallet>
+test -n "$IFHOST_TOPUP_SIGNING_KEY"       # load it out-of-band; never type it into shell history
 ifhost billing topup-traffic <GB>         # cost is quoted before it charges
 ```
 
@@ -890,7 +896,7 @@ ifhost machines install --app my-api curl git nodejs npm
 ifhost machines push ./ --to /data/app --app my-api --yes-replace
 ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
 ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossi.build/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossibuild.ai/   # must print 200
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)
@@ -1097,6 +1103,7 @@ ifhost agents status                    # all your agents
 ifhost agents status my-assistant       # one agent, with its verify result
 ifhost agents logs my-assistant         # its recent log, credentials redacted
 ifhost agents logs my-assistant --lines 500
+```
 
 **One line in that log looks like a break and is not.** Shortly after an agent
 starts you will see:
@@ -1115,6 +1122,8 @@ the panel is working correctly.
 
 Do not report this as a fault, do not tell the owner to reset anything, and do
 not rebuild the agent over it.
+
+```bash
 ifhost agents reconfigure my-assistant  # change model, keys or channel
 ifhost agents panel my-assistant --private   # take the control panel off the web
 ifhost agents panel my-assistant --public    # put it back

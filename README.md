@@ -85,9 +85,12 @@ User: Deploy this Node.js app
 Agent: I'll deploy using ifhost.
 
 $ ifhost init --app my-api --port 3000 --memory 512
-$ ifhost deploy --env DATABASE_URL=postgres://...
+$ ifhost deploy --secret DATABASE_URL=@env:DATABASE_URL
+$ ifhost machines push . --to /data/app --app my-api --yes-replace
+$ ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup <start-command> </dev/null > /tmp/app.log 2>&1 &"
+$ curl --fail --silent --show-error --max-time 30 https://my-api.host.impossibuild.ai/
 
-Deployed! Live at: https://my-api.host.impossi.build
+Agent: The app returned HTTP 200 and is live at https://my-api.host.impossibuild.ai
 ```
 
 ## Links

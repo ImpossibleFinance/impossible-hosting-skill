@@ -42,17 +42,23 @@ def verify_docs() -> None:
         re.compile(r"[0-9]+\s*(?:MB|GB|TB)\s+(?:RAM|volume)\s+pool", re.I),
         re.compile(r"[0-9]+\s*GB\s+(?:on|for)\s+(?:free|hobby|pro|team)", re.I),
     )
-    tenant_on_control_domain = re.compile(
-        r"(?:<[^>\s]+>|[A-Za-z0-9_-]+)\.host\.impossibuild\.ai",
-        re.I,
-    )
+
 
     for name in DOCS:
         path = ROOT / name
         text = path.read_text(encoding="utf-8")
+        fence_language: str | None = None
         for number, line in enumerate(text.splitlines(), 1):
             if line.rstrip() != line:
                 fail(f"{name}:{number}: trailing whitespace")
+            if line.startswith("```"):
+                if fence_language is None:
+                    fence_language = line[3:].strip()
+                else:
+                    fence_language = None
+                continue
+            if fence_language in {"bash", "powershell", "toml", "dockerfile"} and line.startswith("**"):
+                fail(f"{name}:{number}: markdown prose is trapped inside a {fence_language} code fence")
             for match in secret_command.finditer(line):
                 if not safe_secret.fullmatch(match.group(1)):
                     fail(f"{name}:{number}: literal secret example is forbidden")
@@ -67,12 +73,17 @@ def verify_docs() -> None:
                 fail(f"{name}:{number}: download the installer completely and inspect it before execution")
             if "https://host.impossi.build/install" in line:
                 fail(f"{name}:{number}: installer must use the separated control-plane domain")
-            if tenant_on_control_domain.search(line):
-                fail(f"{name}:{number}: tenant URL must not reuse the control-plane registrable domain")
+            if re.search(r"https://[A-Za-z0-9_-]+\.host\.impossi\.build", line) and not re.search(r"alias|legacy|pre-move|formerly", line, re.I):
+                fail(f"{name}:{number}: published guidance hands out the current tenant domain "
+                     "(host.impossibuild.ai); host.impossi.build is an alias that serves old "
+                     "URLs, never a name we publish - mark the line as legacy if it must appear")
             if re.search(r"\bcurl\b.*https://", line) and "--max-time" not in line and not line.endswith("\\"):
                 fail(f"{name}:{number}: one-line HTTP examples need a hard deadline")
             if any(pattern.search(line) for pattern in pricing):
                 fail(f"{name}:{number}: plan price or allowance must come from the live API")
+
+        if fence_language is not None:
+            fail(f"{name}: unclosed {fence_language or 'plain'} code fence")
 
         for match in relative_link.finditer(text):
             target = (path.parent / match.group(1)).resolve()
