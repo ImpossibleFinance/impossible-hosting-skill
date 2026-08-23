@@ -780,6 +780,12 @@ ifhost version                           # Show CLI version and check for update
 ifhost update                            # Update CLI to the latest version
 ```
 
+Automatic-check failures are recorded in
+`~/.impossible/update-check.json` while the requested command continues. Set
+`IFHOST_AUTO_UPDATE_DEBUG=1` when you need the same failure on stderr; never
+treat a quiet background check as proof that an update was available or
+installed.
+
 ### ifhost billing (alias: sub)
 
 ```bash
@@ -816,7 +822,7 @@ itself — run its help rather than quoting a price:
 
 ```bash
 ifhost billing topup-traffic --help       # current rate, minimum, and step size
-export IFHOST_TOPUP_SIGNING_KEY=<hex private key of the paying wallet>
+test -n "$IFHOST_TOPUP_SIGNING_KEY"       # load it out-of-band; never type it into shell history
 ifhost billing topup-traffic <GB>         # cost is quoted before it charges
 ```
 
@@ -1097,6 +1103,7 @@ ifhost agents status                    # all your agents
 ifhost agents status my-assistant       # one agent, with its verify result
 ifhost agents logs my-assistant         # its recent log, credentials redacted
 ifhost agents logs my-assistant --lines 500
+```
 
 **One line in that log looks like a break and is not.** Shortly after an agent
 starts you will see:
@@ -1115,6 +1122,8 @@ the panel is working correctly.
 
 Do not report this as a fault, do not tell the owner to reset anything, and do
 not rebuild the agent over it.
+
+```bash
 ifhost agents reconfigure my-assistant  # change model, keys or channel
 ifhost agents panel my-assistant --private   # take the control panel off the web
 ifhost agents panel my-assistant --public    # put it back

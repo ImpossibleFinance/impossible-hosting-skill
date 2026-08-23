@@ -50,9 +50,18 @@ def verify_docs() -> None:
     for name in DOCS:
         path = ROOT / name
         text = path.read_text(encoding="utf-8")
+        fence_language: str | None = None
         for number, line in enumerate(text.splitlines(), 1):
             if line.rstrip() != line:
                 fail(f"{name}:{number}: trailing whitespace")
+            if line.startswith("```"):
+                if fence_language is None:
+                    fence_language = line[3:].strip()
+                else:
+                    fence_language = None
+                continue
+            if fence_language in {"bash", "powershell", "toml", "dockerfile"} and line.startswith("**"):
+                fail(f"{name}:{number}: markdown prose is trapped inside a {fence_language} code fence")
             for match in secret_command.finditer(line):
                 if not safe_secret.fullmatch(match.group(1)):
                     fail(f"{name}:{number}: literal secret example is forbidden")
@@ -73,6 +82,9 @@ def verify_docs() -> None:
                 fail(f"{name}:{number}: one-line HTTP examples need a hard deadline")
             if any(pattern.search(line) for pattern in pricing):
                 fail(f"{name}:{number}: plan price or allowance must come from the live API")
+
+        if fence_language is not None:
+            fail(f"{name}: unclosed {fence_language or 'plain'} code fence")
 
         for match in relative_link.finditer(text):
             target = (path.parent / match.group(1)).resolve()
