@@ -228,7 +228,7 @@ Implications for you as the agent driving the deploy:
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
-**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossi.build/healthz` returns 200
+**Hard rule:** the deploy is DONE when `curl --fail --show-error --max-time 30 https://<app>.host.impossi.build/healthz` returns 200
 (or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
 WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
 APP's problem, not the deploy.
@@ -1220,9 +1220,9 @@ for weeks after the catalog moved, and called a capped limit unlimited.
 Read them live instead, from the source the biller itself uses:
 
 ```bash
-curl -s https://host.impossibuild.ai/billing/plans        # every plan, no auth needed
+curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/billing/plans  # every plan, no auth needed
 ifhost status                                              # the signed-in account's plan and usage
-curl -s https://host.impossibuild.ai/llms.txt              # agent guide, pricing block rendered from the catalog
+curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/llms.txt  # agent guide, pricing block rendered from the catalog
 ```
 
 Quote the account's own plan from `ifhost status`, never a remembered number.

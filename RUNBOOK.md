@@ -288,7 +288,10 @@ Example:
 
 ```bash
 local_hash=$(sha256sum ./assets/app.js | cut -d' ' -f1)
-remote_hash=$(curl -fsSL https://trusted.example/assets/app.js | sha256sum | cut -d' ' -f1)
+remote_hash=$(curl --fail --silent --show-error --location \
+  --proto '=https' --proto-redir '=https' --tlsv1.2 \
+  --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  https://trusted.example/assets/app.js | sha256sum | cut -d' ' -f1)
 test "$local_hash" = "$remote_hash"
 ```
 

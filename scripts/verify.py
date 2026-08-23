@@ -69,6 +69,8 @@ def verify_docs() -> None:
                 fail(f"{name}:{number}: installer must use the separated control-plane domain")
             if tenant_on_control_domain.search(line):
                 fail(f"{name}:{number}: tenant URL must not reuse the control-plane registrable domain")
+            if re.search(r"\bcurl\b.*https://", line) and "--max-time" not in line and not line.endswith("\\"):
+                fail(f"{name}:{number}: one-line HTTP examples need a hard deadline")
             if any(pattern.search(line) for pattern in pricing):
                 fail(f"{name}:{number}: plan price or allowance must come from the live API")
 
