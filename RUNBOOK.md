@@ -22,7 +22,14 @@ A deployment is complete only when:
   verified skill bundle before every deployment session:
 
   ```bash
-  command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossibuild.ai/install | sh
+  if ! command -v ifhost >/dev/null 2>&1; then
+    installer="$(mktemp)"
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+      https://host.impossibuild.ai/install -o "$installer" &&
+      cat "$installer" && sh "$installer"
+    rc=$?; rm -f "$installer"; [ "$rc" -eq 0 ] || exit "$rc"
+  fi
   ifhost version
   ifhost skill sync
   ```
@@ -31,7 +38,13 @@ A deployment is complete only when:
 
   ```powershell
   if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-    irm https://host.impossibuild.ai/install.ps1 | iex
+    $installer = Join-Path ([IO.Path]::GetTempPath()) "ifhost-install-$([guid]::NewGuid()).ps1"
+    try {
+      Invoke-WebRequest -Uri https://host.impossibuild.ai/install.ps1 `
+        -MaximumRedirection 0 -TimeoutSec 60 -OutFile $installer
+      Get-Content $installer
+      & $installer
+    } finally { Remove-Item $installer -ErrorAction SilentlyContinue }
   }
   ifhost version
   ifhost skill sync
@@ -314,17 +327,17 @@ Test the health or root route first:
 curl -sS -o /dev/null \
   -w "%{http_code} %{content_type} %{size_download}\n" \
   --max-time 30 \
-  https://<app-name>.host.impossibuild.ai/
+  https://<app-name>.host.impossi.build/
 ```
 
 Then test representative routes and important assets:
 
 ```bash
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 30 \
-  https://<app-name>.host.impossibuild.ai/docs/
+  https://<app-name>.host.impossi.build/docs/
 
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 30 \
-  https://<app-name>.host.impossibuild.ai/assets/app.js
+  https://<app-name>.host.impossi.build/assets/app.js
 ```
 
 For a static site, verify at least:

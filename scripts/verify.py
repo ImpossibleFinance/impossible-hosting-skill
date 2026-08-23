@@ -42,6 +42,10 @@ def verify_docs() -> None:
         re.compile(r"[0-9]+\s*(?:MB|GB|TB)\s+(?:RAM|volume)\s+pool", re.I),
         re.compile(r"[0-9]+\s*GB\s+(?:on|for)\s+(?:free|hobby|pro|team)", re.I),
     )
+    tenant_on_control_domain = re.compile(
+        r"(?:<[^>\s]+>|[A-Za-z0-9_-]+)\.host\.impossibuild\.ai",
+        re.I,
+    )
 
     for name in DOCS:
         path = ROOT / name
@@ -52,12 +56,19 @@ def verify_docs() -> None:
             for match in secret_command.finditer(line):
                 if not safe_secret.fullmatch(match.group(1)):
                     fail(f"{name}:{number}: literal secret example is forbidden")
-            if re.search(r"ifhost\s+login\s+--token\s+(?!-\s*$)[^\s`]+", line):
+            token_login = re.search(r"ifhost\s+login\s+--token(?:=|\s+)([^\s`|]+)", line)
+            if token_login and token_login.group(1) != "-":
                 fail(f"{name}:{number}: token must come from stdin or --from-file")
             if re.search(r"machines\s+secrets\s+set.*--from-file", line):
                 fail(f"{name}:{number}: secrets set uses KEY=@file:PATH, not --from-file")
             if re.search(r"/dl/ifhost_[^|\s]+\s*\|\s*(?:tar|unzip)", line):
                 fail(f"{name}:{number}: direct unsigned archive pipe is forbidden")
+            if re.search(r"https://host\.(?:impossi\.build|impossibuild\.ai)/install(?:\.ps1)?\s*\|\s*(?:sh|bash|iex)", line, re.I):
+                fail(f"{name}:{number}: download the installer completely and inspect it before execution")
+            if "https://host.impossi.build/install" in line:
+                fail(f"{name}:{number}: installer must use the separated control-plane domain")
+            if tenant_on_control_domain.search(line):
+                fail(f"{name}:{number}: tenant URL must not reuse the control-plane registrable domain")
             if any(pattern.search(line) for pattern in pricing):
                 fail(f"{name}:{number}: plan price or allowance must come from the live API")
 

@@ -18,17 +18,29 @@ missing; otherwise invoking it performs its signature-verified automatic update.
 Then sync the latest skill bundle:
 
 ```bash
-command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossibuild.ai/install | sh
+if ! command -v ifhost >/dev/null 2>&1; then
+  installer="$(mktemp)"
+  curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+    --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+    https://host.impossibuild.ai/install -o "$installer" &&
+    cat "$installer" && sh "$installer"
+  rc=$?; rm -f "$installer"; [ "$rc" -eq 0 ] || exit "$rc"
+fi
 ifhost version
 ifhost skill sync
 ```
 
-On Windows, the same three steps in PowerShell — `curl | sh` cannot run
-there:
+On Windows, use the same download-inspect-execute boundary in PowerShell:
 
 ```powershell
 if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-  irm https://host.impossibuild.ai/install.ps1 | iex
+  $installer = Join-Path ([IO.Path]::GetTempPath()) "ifhost-install-$([guid]::NewGuid()).ps1"
+  try {
+    Invoke-WebRequest -Uri https://host.impossibuild.ai/install.ps1 `
+      -MaximumRedirection 0 -TimeoutSec 60 -OutFile $installer
+    Get-Content $installer
+    & $installer
+  } finally { Remove-Item $installer -ErrorAction SilentlyContinue }
 }
 ifhost version
 ifhost skill sync
@@ -51,7 +63,7 @@ ready — your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
    `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
-2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossibuild.ai/`
+2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossi.build/`
    printed `200` (or the app's health endpoint did)
 
 Until then, NEVER tell the user "deployed", "live", or "running" — a
@@ -216,7 +228,7 @@ Implications for you as the agent driving the deploy:
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
-**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossibuild.ai/healthz` returns 200
+**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossi.build/healthz` returns 200
 (or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
 WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
 APP's problem, not the deploy.
@@ -251,7 +263,13 @@ flags. Do not infer runner lifecycle from generic examples in help output:
 ## Install / Update
 
 ```bash
-curl -fsSL https://host.impossibuild.ai/install | sh
+installer="$(mktemp)"
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+  --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  https://host.impossibuild.ai/install -o "$installer"
+cat "$installer"
+sh "$installer"
+rm -f "$installer"
 ```
 
 Run this at the start of EVERY session, not just the first (Rule 0) — it
@@ -298,7 +316,8 @@ always be started again.
 ```bash
 ifhost deploy --secret KEY=@env:KEY --yes
 ifhost machines console start --app <app> -- bash
-# install via curl | bash, configure, launch daemon in detached tmux inside /data
+# download and inspect upstream installers before executing them, then configure
+# and launch the daemon in detached tmux inside /data
 ```
 
 See "Interactive setup" in Common Deployment Patterns for the full console workflow.
@@ -331,7 +350,7 @@ ifhost machines install --app my-site python3
 printf '%s\n' 'state/data.db' > .ifhost-state-paths  # only when the app owns this runtime path
 ifhost machines push ./ --to /data/app --app my-site --yes-replace
 ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossibuild.ai/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossi.build/   # must print 200
 ```
 
 **Gotchas that burn tokens on runner deploys (learned the hard way):**
@@ -341,7 +360,7 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impos
   ifhost machines install --app X curl xz-utils procps git
   ```
   Discovering each missing tool one failure at a time wastes 30s+ per round trip.
-- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before any `curl | bash`.
+- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before running a downloaded and inspected installer.
 - **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths or set an explicit administrative `PATH` inside `/bin/sh`; do not assume `bash -lc` exists.
 - **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10x more tokens than just answering arrow-key prompts.
 - **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
@@ -363,7 +382,7 @@ already logged in, the account picker still lets you switch or add an account.
 
 | Flag | Description |
 |------|-------------|
-| `--token <token>` | Use an API token directly (legacy; the value is visible in argv). Prefer `--token -`, which reads it from stdin |
+| `--token -` | Read an API token from stdin; literal values are refused so they cannot leak through argv or shell history |
 | `--from-file <path>` | Read the token from a local secret file (`-` = stdin) — avoids shell history and `ps` exposure |
 | `--switch` | Switch between existing accounts |
 
@@ -383,13 +402,13 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://my-api.host.impossibuild.ai
+    URL:     https://my-api.host.impossi.build
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
 
   my-site
-    URL:     https://my-site.host.impossibuild.ai
+    URL:     https://my-site.host.impossi.build
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -409,7 +428,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--app` | (required) | App name — becomes `<name>.host.impossibuild.ai` |
+| `--app` | (required) | App name — becomes `<name>.host.impossi.build` |
 | `--port` | 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
@@ -447,7 +466,7 @@ Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
 
 **After deploy:** Prints the public URL (e.g.,
-`https://my-app.host.impossibuild.ai`). The application is not live until you
+`https://my-app.host.impossi.build`). The application is not live until you
 start it and verify HTTP `200`.
 
 #### Redeploying is safe — the app keeps its address
@@ -871,7 +890,7 @@ ifhost machines install --app my-api curl git nodejs npm
 ifhost machines push ./ --to /data/app --app my-api --yes-replace
 ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
 ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossibuild.ai/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossi.build/   # must print 200
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)

@@ -21,7 +21,13 @@ Use the ifhost skill to deploy this project.
 ## Install the CLI
 
 ```bash
-curl -fsSL https://host.impossibuild.ai/install | sh
+installer="$(mktemp)"
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+  --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  https://host.impossibuild.ai/install -o "$installer"
+cat "$installer"                   # inspect the complete file before execution
+sh "$installer"
+rm -f "$installer"
 ```
 
 Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS, Linux and
@@ -30,7 +36,12 @@ Windows, on both Intel/AMD (x86-64) and ARM.
 On Windows, run this in PowerShell instead:
 
 ```powershell
-irm https://host.impossibuild.ai/install.ps1 | iex
+$installer = Join-Path ([IO.Path]::GetTempPath()) "ifhost-install-$([guid]::NewGuid()).ps1"
+Invoke-WebRequest -Uri https://host.impossibuild.ai/install.ps1 `
+  -MaximumRedirection 0 -TimeoutSec 60 -OutFile $installer
+Get-Content $installer                # inspect before executing downloaded code
+& $installer
+Remove-Item $installer
 ```
 The CLI checks hourly, verifies independently signed release metadata and the
 artifact digest, updates atomically, and re-runs the requested command. Set
@@ -76,7 +87,7 @@ Agent: I'll deploy using ifhost.
 $ ifhost init --app my-api --port 3000 --memory 512
 $ ifhost deploy --env DATABASE_URL=postgres://...
 
-Deployed! Live at: https://my-api.host.impossibuild.ai
+Deployed! Live at: https://my-api.host.impossi.build
 ```
 
 ## Links
