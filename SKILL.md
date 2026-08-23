@@ -14,7 +14,7 @@ ordered deployment and recovery procedure.
 ### 0. Refresh the CLI and these instructions first, every session
 
 The platform evolves quickly. Before ANY ifhost work, install the CLI if it is
-missing; otherwise invoking it performs its checksum-verified automatic update.
+missing; otherwise invoking it performs its signature-verified automatic update.
 Then sync the latest skill bundle:
 
 ```bash
@@ -94,8 +94,8 @@ Port:          ___  (check app docs, docker-compose ports, or app --help)
 RAM:           ___  (512MB for small Node/Python apps, 1024MB+ for builds/background work, 2048MB+ if heavy)
 CPUs:          ___  (1 for simple, 2+ for AI/heavy compute)
 Autostop:      ___  (false for bots, long-polling services, or apps that take >60s to boot)
-Env vars:      ___  (list every KEY=VALUE the app needs)
-Secrets:       ___  (API keys, tokens — ask the user, never guess)
+Env vars:      ___  (list every non-secret KEY=VALUE the app needs)
+Secrets:       ___  (list key names and protected sources only; never paste values here)
 Startup cmd:   ___  (setup before serving: config generation, migrations, --bind lan)
 Bind address:  ___  (many apps default to localhost — must bind to 0.0.0.0 or use --bind lan)
 Storage:       ___  (runner default: 1 GB local /data; is that enough, and must state be shared?)
@@ -128,11 +128,14 @@ Even if the user said something like "deploy this", still ask. The user may want
 domain name. For specs, nudge them toward accepting your picks — you've actually read the
 project; they haven't. Accepting defaults should be a one-word reply ("go", "ok", "yes").
 
-**Step D — Ask for credentials/missing info:**
-- API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
-- Bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.)
-- Database URLs
-- Any credentials you can't find in the docs
+**Step D — Resolve credentials/missing info:**
+- Ask for the names of required API keys, bot tokens, and database credentials,
+  but do not ask the user to paste secret values into chat.
+- Have the user expose each value through an environment variable, a protected
+  local file, or stdin. Pass only a reference such as `KEY=@env:KEY`,
+  `KEY=@file:/run/secrets/key`, or `KEY=@stdin` to ifhost.
+- Never guess credentials or place them in `impossible.toml`, a command
+  argument, a transcript, or a source archive.
 - Model preferences (which AI model to use, if applicable)
 
 **Step E — Present the full deployment plan for final approval.**
@@ -266,25 +269,9 @@ Verify installation:
 ifhost --help
 ```
 
-If the install script fails (e.g., no curl, restricted network), manually download:
-
-```bash
-# macOS ARM (Apple Silicon)
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_arm64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# macOS Intel
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_amd64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# Linux x86_64
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_amd64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# Linux ARM64
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_arm64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-```
+If the installer fails, do not bypass its signature check with a direct
+archive pipe. Follow the signed manual-download procedure in the
+[`impossible-hosting-cli` repository](https://github.com/ImpossibleFinance/impossible-hosting-cli#manual-download).
 
 ## Quick Start
 
@@ -309,7 +296,7 @@ may need to be recreated after a restart, and the application process must
 always be started again.
 
 ```bash
-ifhost deploy --secret KEY=VAL --yes
+ifhost deploy --secret KEY=@env:KEY --yes
 ifhost machines console start --app <app> -- bash
 # install via curl | bash, configure, launch daemon in detached tmux inside /data
 ```
@@ -330,7 +317,7 @@ Read it FIRST and translate line-by-line into runner commands:
 | `COPY . /app` | `machines push ./ --to /data/app --app X --yes-replace` |
 | `WORKDIR /app` | prefix later commands with `cd /data/app &&` |
 | `ENV K=V` | `[env]` in impossible.toml, or `--env K=V` on deploy |
-| secrets in ENV | `--secret K=V` / `machines secrets set` |
+| secrets in ENV | `--secret K=@env:K` / `machines secrets set K=@env:K` |
 | `EXPOSE 8080` | `[service] internal_port = 8080` |
 | `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /data/app && setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"` |
 | `HEALTHCHECK` | your Rule 0b verify curl |
@@ -447,7 +434,7 @@ ifhost deploy [flags]
 | Flag | Description |
 |------|-------------|
 | `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
-| `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
+| `--secret KEY=@env:NAME` | Set a secret by protected reference. Also accepts `KEY=@file:PATH` or one `KEY=@stdin`; literal values are refused |
 | `--port N` | Override container port |
 | `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
 | `--storage local` | Explicitly provision a `/data` volume on first deploy. With no storage flag or declared volumes, runner deploys currently provision a 1 GB `/data` volume automatically. |
@@ -634,7 +621,9 @@ ifhost machines env set KEY=VALUE --app my-app              # Set (no restart)
 ifhost machines env set KEY=VALUE --restart --app my-app    # Set + restart immediately
 ifhost machines env list --app my-app
 ifhost machines env rm KEY --app my-app                     # Remove env var
-ifhost machines secrets set API_KEY=sk-... --app my-app
+ifhost machines secrets set API_KEY=@env:API_KEY --app my-app
+ifhost machines secrets set API_KEY=@file:/run/secrets/api-key --app my-app
+printf '%s' "$API_KEY" | ifhost machines secrets set API_KEY=@stdin --app my-app
 ifhost machines secrets list --app my-app                   # Shows key names only
 ifhost machines secrets rm KEY --app my-app                 # Remove secret
 ```
@@ -748,10 +737,10 @@ printf '%s' "$IFHOST_TOKEN" | ifhost login --token -
 ifhost login --from-file /run/secrets/ifhost-token
 ```
 
-`ifhost machines secrets set` also accepts `--from-file -` on stdin or a local
-file containing `KEY=VALUE` pairs. Only values are sent to the platform; the
-file itself stays local. Keep local secret files access-restricted and remove
-temporary copies after use.
+For application secrets, pass a source reference to `deploy --secret` or
+`machines secrets set`: `KEY=@env:NAME`, `KEY=@file:PATH`, or (for one secret
+per command) `KEY=@stdin`. Literal secret values are refused. Only the resolved
+value is sent to the platform; local files stay local.
 
 ### ifhost auth
 
@@ -864,9 +853,10 @@ create it explicitly with `machines exec` or `machines write` before starting
 the process. Repeat that setup after a restart when the generated file is not
 under `/data`.
 
-**Secrets:** Pass via `--secret` on the deploy command, NOT in the toml file:
+**Secrets:** Pass a protected reference via `--secret`, not a literal value or
+a tracked TOML file:
 ```bash
-ifhost deploy --secret API_KEY=sk-... --secret BOT_TOKEN=123:ABC
+ifhost deploy --secret API_KEY=@env:API_KEY --secret BOT_TOKEN=@file:/run/secrets/bot-token
 ```
 
 ---
@@ -887,7 +877,7 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.imposs
 ### Heavy app (AI agent, ML model, slow boot)
 ```bash
 ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1 --storage local
-ifhost deploy --secret OPENAI_API_KEY=sk-...
+ifhost deploy --secret OPENAI_API_KEY=@env:OPENAI_API_KEY
 # Then drive the project's own install via exec/console (see Interactive setup)
 ```
 
@@ -915,8 +905,8 @@ NODE_ENV = "production"
 
 ```bash
 ifhost deploy \
-  --secret TELEGRAM_BOT_TOKEN=123456:ABC... \
-  --secret OPENAI_API_KEY=sk-... \
+  --secret TELEGRAM_BOT_TOKEN=@env:TELEGRAM_BOT_TOKEN \
+  --secret OPENAI_API_KEY=@env:OPENAI_API_KEY \
   --env TELEGRAM_CHAT_ID=623508703
 ifhost machines push ./ --to /data/app --app my-bot --yes-replace
 ifhost machines exec --app my-bot -- sh -c "cd /data/app && npm install"

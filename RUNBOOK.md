@@ -38,7 +38,7 @@ A deployment is complete only when:
   ```
 
 - If `skill sync` prints paths different from the files currently loaded,
-  read the refreshed files before continuing. A checksum failure is a hard
+  read the refreshed files before continuing. A signature or digest failure is a hard
   stop; do not use a partially updated bundle.
 - Use the freshly updated CLI's `--help` to confirm command syntax and
   available flags. Do not infer runner lifecycle from generic examples:
@@ -53,6 +53,10 @@ A deployment is complete only when:
 - If unattended automatic recovery after a machine restart is required, stop
   and report that the runner workflow does not provide it.
 - Never expose Git credentials or application secrets to move source files.
+- Never put a secret value in argv, chat, or a tracked manifest. Make it
+  available through an environment variable, a protected local file, or stdin,
+  and pass `KEY=@env:NAME`, `KEY=@file:PATH`, or `KEY=@stdin` with
+  `deploy --secret` or `machines secrets set`.
 - If the source repository must remain untouched, create `impossible.toml`
   and all packaging artifacts in a temporary directory outside it.
 - Do not declare success without a real HTTP `200`.

@@ -32,8 +32,9 @@ On Windows, run this in PowerShell instead:
 ```powershell
 irm https://host.impossibuild.ai/install.ps1 | iex
 ```
-The CLI checks hourly, verifies the release checksum, updates atomically, and
-re-runs the requested command. Set `IFHOST_AUTO_UPDATE=0` to pin a version.
+The CLI checks hourly, verifies independently signed release metadata and the
+artifact digest, updates atomically, and re-runs the requested command. Set
+`IFHOST_AUTO_UPDATE=0` to pin a version.
 
 Refresh the agent instructions with:
 
@@ -44,25 +45,9 @@ ifhost skill sync
 This verifies `SKILL.md` and `RUNBOOK.md` before replacing the local cached
 copies under `~/.impossible/skill/`.
 
-If the script fails, download directly:
-
-```bash
-# macOS ARM (Apple Silicon)
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_arm64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# macOS Intel
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_amd64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# Linux x86_64
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_amd64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# Linux ARM64
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_arm64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-```
+If the installer fails, do not bypass its signature check with a direct
+archive pipe. Follow the signed manual-download procedure in the
+[`impossible-hosting-cli` repository](https://github.com/ImpossibleFinance/impossible-hosting-cli#manual-download).
 
 Then add to PATH if needed:
 
