@@ -685,6 +685,24 @@ Surface its manual configuration and explain that an unpurchased domain must be
 registered first, while an owned domain may need its nameservers configured.
 TLS issuance is automatic after the required records are correct.
 
+### ifhost sites domains
+
+Published static sites take custom domains too, with the identical flow —
+prove control, add the printed records, certificate issues on its own. The
+site is named as the first argument (sites have no `--app` context):
+
+```bash
+ifhost sites domains add my-page myapp.com
+ifhost sites domains check my-page myapp.com
+ifhost sites domains list my-page
+ifhost sites domains rm my-page myapp.com
+```
+
+Everything in the `machines domains` section above — the proof record, the
+two-minute wait and re-run behavior, treating `domains check` output as
+authoritative, never inventing provider workflows — applies to these
+commands unchanged.
+
 ### ifhost machines write / push
 
 ```bash
