@@ -660,11 +660,13 @@ ifhost machines domains rm myapp.com --app my-app       # Remove custom domain
 ```
 
 `domains add` claims the hostname only after the user proves they control
-its DNS. It prints ONE TXT record (name `_hostimpossibuild-verify.<hostname>`, value
-from the command output) and waits up to two minutes for it to appear; if it
-gives up, add the record, wait a minute, and run the same command again — it
-picks up where it left off. Only then does it print the address records.
-Tell the user to keep the TXT record after setup.
+its DNS. It prints the two records to add — a CNAME from the hostname to
+the platform (an ALIAS at a bare domain) and one TXT proof record
+(`_hostimpossibuild-verify.<hostname>`), values from the command output —
+and waits up to two minutes for the proof to appear; if it gives up, add
+the records, wait a minute, and run the same command again — it picks up
+where it left off. There are no address records to add. Tell the user to
+keep the TXT record after setup.
 
 DNS requirements are returned by the current platform and may change. Never
 infer a CNAME or copy record values or provider URLs from this skill. Run
