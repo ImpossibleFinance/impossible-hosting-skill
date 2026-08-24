@@ -660,7 +660,7 @@ ifhost machines domains rm myapp.com --app my-app       # Remove custom domain
 ```
 
 `domains add` claims the hostname only after the user proves they control
-its DNS. It prints ONE TXT record (name `_ifhost-verify.<hostname>`, value
+its DNS. It prints ONE TXT record (name `_hostimpossibuild-verify.<hostname>`, value
 from the command output) and waits up to two minutes for it to appear; if it
 gives up, add the record, wait a minute, and run the same command again — it
 picks up where it left off. Only then does it print the address records.
