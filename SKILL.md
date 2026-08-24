@@ -685,6 +685,37 @@ Surface its manual configuration and explain that an unpurchased domain must be
 registered first, while an owned domain may need its nameservers configured.
 TLS issuance is automatic after the required records are correct.
 
+### ifhost publish and ifhost sites
+
+`publish` puts files on the web with no machine and no config: live in
+seconds at the tenant URL the command prints.
+
+```bash
+ifhost publish --name my-page page.html         # one HTML file, served as the page
+ifhost publish --name menu cover.pdf body.pdf   # PDFs combined into ONE document
+ifhost publish --name gallery hero.png pic.jpg  # images stacked into one scrolling page
+ifhost sites list                               # name, URL, mode, size, updated
+ifhost sites rm my-page                         # delete a site
+```
+
+File order is the order typed: PDF pages merge in that order, images stack
+top-to-bottom. Re-running `publish` with the same `--name` replaces the
+site's entire content — that is also how to rearrange. A single PDF or
+image is served directly at `/`.
+
+Rules that change what an agent should do:
+- Site names are GLOBAL across every account. First claim wins, and
+  `sites rm` frees the name for ANYONE to take. Deletion is immediate and
+  irreversible — say so to the user before confirming.
+- `sites rm` asks interactively. Agents and scripts must pass `--yes`, or
+  the command refuses and prints the flag instead of hanging on a prompt.
+- `publish` is one HTML file or PDFs/images, never both. A multi-file
+  website (HTML plus assets) is `ifhost deploy` territory.
+- Site count and size limits are plan-dependent; run `ifhost billing`
+  rather than quoting numbers from memory.
+
+Custom domains on a published site: see the next section.
+
 ### ifhost sites domains
 
 Published static sites take custom domains too, with the identical flow —
