@@ -63,7 +63,7 @@ ready — your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
    `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
-2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossi.build/`
+2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossibuild.ai/`
    printed `200` (or the app's health endpoint did)
 
 Until then, NEVER tell the user "deployed", "live", or "running" — a
@@ -228,7 +228,7 @@ Implications for you as the agent driving the deploy:
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
-**Hard rule:** the deploy is DONE when `curl --fail --show-error --max-time 30 https://<app>.host.impossi.build/healthz` returns 200
+**Hard rule:** the deploy is DONE when `curl --fail --show-error --max-time 30 https://<app>.host.impossibuild.ai/healthz` returns 200
 (or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
 WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
 APP's problem, not the deploy.

@@ -73,7 +73,7 @@ def verify_docs() -> None:
                 fail(f"{name}:{number}: download the installer completely and inspect it before execution")
             if "https://host.impossi.build/install" in line:
                 fail(f"{name}:{number}: installer must use the separated control-plane domain")
-            if re.search(r"https://[A-Za-z0-9_-]+\.host\.impossi\.build", line) and not re.search(r"alias|legacy|pre-move|formerly", line, re.I):
+            if re.search(r"https://<[A-Za-z0-9_-]+>\.host\.impossi\.build|https://[A-Za-z0-9_-]+\.host\.impossi\.build", line) and not re.search(r"alias|legacy|pre-move|formerly", line, re.I):
                 fail(f"{name}:{number}: published guidance hands out the current tenant domain "
                      "(host.impossibuild.ai); host.impossi.build is an alias that serves old "
                      "URLs, never a name we publish - mark the line as legacy if it must appear")
