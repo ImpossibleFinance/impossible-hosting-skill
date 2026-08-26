@@ -30,8 +30,9 @@ sh "$installer"
 rm -f "$installer"
 ```
 
-Installs the `ifhost` binary to `~/.local/bin/`. Supports macOS, Linux and
-Windows, on both Intel/AMD (x86-64) and ARM.
+Installs the `ifhost` binary to `~/.local/bin/` (`%LOCALAPPDATA%\ifhost\` on
+Windows, where the installer also adds that folder to the user PATH). Supports
+macOS, Linux and Windows, on both Intel/AMD (x86-64) and ARM.
 
 On Windows, run this in PowerShell instead:
 
@@ -54,13 +55,15 @@ ifhost skill sync
 ```
 
 This verifies `SKILL.md` and `RUNBOOK.md` before replacing the local cached
-copies under `~/.impossible/skill/`.
+copies under `~/.impossible/skill/` (`%USERPROFILE%\.impossible\skill\` on
+Windows).
 
 If the installer fails, do not bypass its signature check with a direct
 archive pipe. Follow the signed manual-download procedure in the
 [`impossible-hosting-cli` repository](https://github.com/ImpossibleFinance/impossible-hosting-cli#manual-download).
 
-Then add to PATH if needed:
+On macOS/Linux, add to PATH if needed (the Windows installer updates the user
+PATH itself; open a new terminal afterwards):
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"

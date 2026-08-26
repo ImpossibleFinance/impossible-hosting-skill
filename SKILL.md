@@ -274,12 +274,20 @@ rm -f "$installer"
 
 Run this at the start of EVERY session, not just the first (Rule 0) — it
 updates an existing binary in place. It downloads the correct binary for the
-current OS/architecture (macOS/Linux, amd64/arm64)
+current OS/architecture (macOS/Linux/Windows, amd64/arm64)
 and installs it to `~/.local/bin/ifhost`. If `~/.local/bin` is not in PATH, add it:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
+
+On Windows, use the PowerShell block from the session-start section above: it
+installs `%LOCALAPPDATA%\ifhost\ifhost.exe`, adds that folder to the user PATH
+itself (open a new terminal afterwards), and verifies the release signature
+with `ssh-keygen` from the OpenSSH Client — if the installer reports that
+missing, run `Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0`
+in an elevated PowerShell and retry. Environment variables are set with
+`$env:NAME = "value"` there, not `export`.
 
 Verify installation:
 
@@ -377,7 +385,8 @@ sign-in code, opens the approval page, and polls until you approve it. The
 approval page can be opened on any browser-capable device; it does not need a
 browser or loopback listener on the machine running `ifhost`. Sign in through
 the providers configured in the dashboard, verify the displayed machine, and
-approve it. Credentials are stored at `~/.impossible/credentials.json`. If
+approve it. Credentials are stored at `~/.impossible/credentials.json`
+(`%USERPROFILE%\.impossible\credentials.json` on Windows). If
 already logged in, the account picker still lets you switch or add an account.
 
 | Flag | Description |
@@ -839,7 +848,8 @@ ifhost update                            # Update CLI to the latest version
 ```
 
 Automatic-check failures are recorded in
-`~/.impossible/update-check.json` while the requested command continues. Set
+`~/.impossible/update-check.json` (under `%USERPROFILE%` on Windows) while
+the requested command continues. Set
 `IFHOST_AUTO_UPDATE_DEBUG=1` when you need the same failure on stderr; never
 treat a quiet background check as proof that an update was available or
 installed.
