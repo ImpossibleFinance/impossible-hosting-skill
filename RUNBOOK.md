@@ -22,7 +22,14 @@ A deployment is complete only when:
   verified skill bundle before every deployment session:
 
   ```bash
-  command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossibuild.ai/install | sh
+  if ! command -v ifhost >/dev/null 2>&1; then
+    installer="$(mktemp)"
+    curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+      --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+      https://host.impossibuild.ai/install -o "$installer" &&
+      cat "$installer" && sh "$installer"
+    rc=$?; rm -f "$installer"; [ "$rc" -eq 0 ] || exit "$rc"
+  fi
   ifhost version
   ifhost skill sync
   ```
@@ -31,14 +38,20 @@ A deployment is complete only when:
 
   ```powershell
   if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-    irm https://host.impossibuild.ai/install.ps1 | iex
+    $installer = Join-Path ([IO.Path]::GetTempPath()) "ifhost-install-$([guid]::NewGuid()).ps1"
+    try {
+      Invoke-WebRequest -Uri https://host.impossibuild.ai/install.ps1 `
+        -MaximumRedirection 0 -TimeoutSec 60 -OutFile $installer
+      Get-Content $installer
+      & $installer
+    } finally { Remove-Item $installer -ErrorAction SilentlyContinue }
   }
   ifhost version
   ifhost skill sync
   ```
 
 - If `skill sync` prints paths different from the files currently loaded,
-  read the refreshed files before continuing. A checksum failure is a hard
+  read the refreshed files before continuing. A signature or digest failure is a hard
   stop; do not use a partially updated bundle.
 - Use the freshly updated CLI's `--help` to confirm command syntax and
   available flags. Do not infer runner lifecycle from generic examples:
@@ -53,6 +66,10 @@ A deployment is complete only when:
 - If unattended automatic recovery after a machine restart is required, stop
   and report that the runner workflow does not provide it.
 - Never expose Git credentials or application secrets to move source files.
+- Never put a secret value in argv, chat, or a tracked manifest. Make it
+  available through an environment variable, a protected local file, or stdin,
+  and pass `KEY=@env:NAME`, `KEY=@file:PATH`, or `KEY=@stdin` with
+  `deploy --secret` or `machines secrets set`.
 - If the source repository must remain untouched, create `impossible.toml`
   and all packaging artifacts in a temporary directory outside it.
 - Do not declare success without a real HTTP `200`.
@@ -271,7 +288,10 @@ Example:
 
 ```bash
 local_hash=$(sha256sum ./assets/app.js | cut -d' ' -f1)
-remote_hash=$(curl -fsSL https://trusted.example/assets/app.js | sha256sum | cut -d' ' -f1)
+remote_hash=$(curl --fail --silent --show-error --location \
+  --proto '=https' --proto-redir '=https' --tlsv1.2 \
+  --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  https://trusted.example/assets/app.js | sha256sum | cut -d' ' -f1)
 test "$local_hash" = "$remote_hash"
 ```
 

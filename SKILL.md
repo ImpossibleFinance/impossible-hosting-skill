@@ -14,21 +14,33 @@ ordered deployment and recovery procedure.
 ### 0. Refresh the CLI and these instructions first, every session
 
 The platform evolves quickly. Before ANY ifhost work, install the CLI if it is
-missing; otherwise invoking it performs its checksum-verified automatic update.
+missing; otherwise invoking it performs its signature-verified automatic update.
 Then sync the latest skill bundle:
 
 ```bash
-command -v ifhost >/dev/null 2>&1 || curl -fsSL https://host.impossibuild.ai/install | sh
+if ! command -v ifhost >/dev/null 2>&1; then
+  installer="$(mktemp)"
+  curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+    --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+    https://host.impossibuild.ai/install -o "$installer" &&
+    cat "$installer" && sh "$installer"
+  rc=$?; rm -f "$installer"; [ "$rc" -eq 0 ] || exit "$rc"
+fi
 ifhost version
 ifhost skill sync
 ```
 
-On Windows, the same three steps in PowerShell — `curl | sh` cannot run
-there:
+On Windows, use the same download-inspect-execute boundary in PowerShell:
 
 ```powershell
 if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-  irm https://host.impossibuild.ai/install.ps1 | iex
+  $installer = Join-Path ([IO.Path]::GetTempPath()) "ifhost-install-$([guid]::NewGuid()).ps1"
+  try {
+    Invoke-WebRequest -Uri https://host.impossibuild.ai/install.ps1 `
+      -MaximumRedirection 0 -TimeoutSec 60 -OutFile $installer
+    Get-Content $installer
+    & $installer
+  } finally { Remove-Item $installer -ErrorAction SilentlyContinue }
 }
 ifhost version
 ifhost skill sync
@@ -94,8 +106,8 @@ Port:          ___  (check app docs, docker-compose ports, or app --help)
 RAM:           ___  (512MB for small Node/Python apps, 1024MB+ for builds/background work, 2048MB+ if heavy)
 CPUs:          ___  (1 for simple, 2+ for AI/heavy compute)
 Autostop:      ___  (false for bots, long-polling services, or apps that take >60s to boot)
-Env vars:      ___  (list every KEY=VALUE the app needs)
-Secrets:       ___  (API keys, tokens — ask the user, never guess)
+Env vars:      ___  (list every non-secret KEY=VALUE the app needs)
+Secrets:       ___  (list key names and protected sources only; never paste values here)
 Startup cmd:   ___  (setup before serving: config generation, migrations, --bind lan)
 Bind address:  ___  (many apps default to localhost — must bind to 0.0.0.0 or use --bind lan)
 Storage:       ___  (runner default: 1 GB local /data; is that enough, and must state be shared?)
@@ -128,11 +140,14 @@ Even if the user said something like "deploy this", still ask. The user may want
 domain name. For specs, nudge them toward accepting your picks — you've actually read the
 project; they haven't. Accepting defaults should be a one-word reply ("go", "ok", "yes").
 
-**Step D — Ask for credentials/missing info:**
-- API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
-- Bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN, etc.)
-- Database URLs
-- Any credentials you can't find in the docs
+**Step D — Resolve credentials/missing info:**
+- Ask for the names of required API keys, bot tokens, and database credentials,
+  but do not ask the user to paste secret values into chat.
+- Have the user expose each value through an environment variable, a protected
+  local file, or stdin. Pass only a reference such as `KEY=@env:KEY`,
+  `KEY=@file:/run/secrets/key`, or `KEY=@stdin` to ifhost.
+- Never guess credentials or place them in `impossible.toml`, a command
+  argument, a transcript, or a source archive.
 - Model preferences (which AI model to use, if applicable)
 
 **Step E — Present the full deployment plan for final approval.**
@@ -213,7 +228,7 @@ Implications for you as the agent driving the deploy:
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
-**Hard rule:** the deploy is DONE when `curl https://<app>.host.impossibuild.ai/healthz` returns 200
+**Hard rule:** the deploy is DONE when `curl --fail --show-error --max-time 30 https://<app>.host.impossibuild.ai/healthz` returns 200
 (or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
 WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
 APP's problem, not the deploy.
@@ -248,17 +263,31 @@ flags. Do not infer runner lifecycle from generic examples in help output:
 ## Install / Update
 
 ```bash
-curl -fsSL https://host.impossibuild.ai/install | sh
+installer="$(mktemp)"
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+  --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  https://host.impossibuild.ai/install -o "$installer"
+cat "$installer"
+sh "$installer"
+rm -f "$installer"
 ```
 
 Run this at the start of EVERY session, not just the first (Rule 0) — it
 updates an existing binary in place. It downloads the correct binary for the
-current OS/architecture (macOS/Linux, amd64/arm64)
+current OS/architecture (macOS/Linux/Windows, amd64/arm64)
 and installs it to `~/.local/bin/ifhost`. If `~/.local/bin` is not in PATH, add it:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
+
+On Windows, use the PowerShell block from the session-start section above: it
+installs `%LOCALAPPDATA%\ifhost\ifhost.exe`, adds that folder to the user PATH
+itself (open a new terminal afterwards), and verifies the release signature
+with `ssh-keygen` from the OpenSSH Client — if the installer reports that
+missing, run `Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0`
+in an elevated PowerShell and retry. Environment variables are set with
+`$env:NAME = "value"` there, not `export`.
 
 Verify installation:
 
@@ -266,25 +295,9 @@ Verify installation:
 ifhost --help
 ```
 
-If the install script fails (e.g., no curl, restricted network), manually download:
-
-```bash
-# macOS ARM (Apple Silicon)
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_arm64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# macOS Intel
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_darwin_amd64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# Linux x86_64
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_amd64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-
-# Linux ARM64
-curl -fsSL https://host.impossibuild.ai/dl/ifhost_linux_arm64.tar.gz | tar xz
-mv ifhost ~/.local/bin/
-```
+If the installer fails, do not bypass its signature check with a direct
+archive pipe. Follow the signed manual-download procedure in the
+[`impossible-hosting-cli` repository](https://github.com/ImpossibleFinance/impossible-hosting-cli#manual-download).
 
 ## Quick Start
 
@@ -309,9 +322,10 @@ may need to be recreated after a restart, and the application process must
 always be started again.
 
 ```bash
-ifhost deploy --secret KEY=VAL --yes
+ifhost deploy --secret KEY=@env:KEY --yes
 ifhost machines console start --app <app> -- bash
-# install via curl | bash, configure, launch daemon in detached tmux inside /data
+# download and inspect upstream installers before executing them, then configure
+# and launch the daemon in detached tmux inside /data
 ```
 
 See "Interactive setup" in Common Deployment Patterns for the full console workflow.
@@ -330,7 +344,7 @@ Read it FIRST and translate line-by-line into runner commands:
 | `COPY . /app` | `machines push ./ --to /data/app --app X --yes-replace` |
 | `WORKDIR /app` | prefix later commands with `cd /data/app &&` |
 | `ENV K=V` | `[env]` in impossible.toml, or `--env K=V` on deploy |
-| secrets in ENV | `--secret K=V` / `machines secrets set` |
+| secrets in ENV | `--secret K=@env:K` / `machines secrets set K=@env:K` |
 | `EXPOSE 8080` | `[service] internal_port = 8080` |
 | `CMD` / `ENTRYPOINT` | start it persistently: `machines exec -- sh -c "cd /data/app && setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"` |
 | `HEALTHCHECK` | your Rule 0b verify curl |
@@ -354,7 +368,7 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impos
   ifhost machines install --app X curl xz-utils procps git
   ```
   Discovering each missing tool one failure at a time wastes 30s+ per round trip.
-- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before any `curl | bash`.
+- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before running a downloaded and inspected installer.
 - **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths or set an explicit administrative `PATH` inside `/bin/sh`; do not assume `bash -lc` exists.
 - **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10x more tokens than just answering arrow-key prompts.
 - **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
@@ -371,12 +385,14 @@ sign-in code, opens the approval page, and polls until you approve it. The
 approval page can be opened on any browser-capable device; it does not need a
 browser or loopback listener on the machine running `ifhost`. Sign in through
 the providers configured in the dashboard, verify the displayed machine, and
-approve it. Credentials are stored at `~/.impossible/credentials.json`. If
+approve it. Credentials are stored at `~/.impossible/credentials.json`
+(`%USERPROFILE%\.impossible\credentials.json` on Windows). If
 already logged in, the account picker still lets you switch or add an account.
 
 | Flag | Description |
 |------|-------------|
-| `--token <token>` | Use an API token directly (for CI/agent use — no browser needed) |
+| `--token -` | Read an API token from stdin; literal values are refused so they cannot leak through argv or shell history |
+| `--from-file <path>` | Read the token from a local secret file (`-` = stdin) — avoids shell history and `ps` exposure |
 | `--switch` | Switch between existing accounts |
 
 ### ifhost logout
@@ -421,7 +437,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--app` | (required) | App name — becomes `<name>.host.impossibuild.ai` |
+| `--app` | (required) | App name — becomes `<name>.host.impossi.build` |
 | `--port` | 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
@@ -446,7 +462,7 @@ ifhost deploy [flags]
 | Flag | Description |
 |------|-------------|
 | `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
-| `--secret KEY=VALUE` | Set secret (repeatable, not shown in logs) |
+| `--secret KEY=@env:NAME` | Set a secret by protected reference. Also accepts `KEY=@file:PATH` or one `KEY=@stdin`; literal values are refused |
 | `--port N` | Override container port |
 | `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
 | `--storage local` | Explicitly provision a `/data` volume on first deploy. With no storage flag or declared volumes, runner deploys currently provision a 1 GB `/data` volume automatically. |
@@ -633,7 +649,9 @@ ifhost machines env set KEY=VALUE --app my-app              # Set (no restart)
 ifhost machines env set KEY=VALUE --restart --app my-app    # Set + restart immediately
 ifhost machines env list --app my-app
 ifhost machines env rm KEY --app my-app                     # Remove env var
-ifhost machines secrets set API_KEY=sk-... --app my-app
+ifhost machines secrets set API_KEY=@env:API_KEY --app my-app
+ifhost machines secrets set API_KEY=@file:/run/secrets/api-key --app my-app
+printf '%s' "$API_KEY" | ifhost machines secrets set API_KEY=@stdin --app my-app
 ifhost machines secrets list --app my-app                   # Shows key names only
 ifhost machines secrets rm KEY --app my-app                 # Remove secret
 ```
@@ -797,7 +815,18 @@ ifhost tokens list                       # List all API tokens
 ifhost tokens revoke <token-id>          # Revoke a token
 ```
 
-Use tokens for CI pipelines or agent auth: `ifhost login --token <token>`.
+Use tokens for CI pipelines or agent auth without putting the credential in an
+argument:
+
+```bash
+printf '%s' "$IFHOST_TOKEN" | ifhost login --token -
+ifhost login --from-file /run/secrets/ifhost-token
+```
+
+For application secrets, pass a source reference to `deploy --secret` or
+`machines secrets set`: `KEY=@env:NAME`, `KEY=@file:PATH`, or (for one secret
+per command) `KEY=@stdin`. Literal secret values are refused. Only the resolved
+value is sent to the platform; local files stay local.
 
 ### ifhost auth
 
@@ -817,6 +846,13 @@ List available deployment regions.
 ifhost version                           # Show CLI version and check for updates
 ifhost update                            # Update CLI to the latest version
 ```
+
+Automatic-check failures are recorded in
+`~/.impossible/update-check.json` (under `%USERPROFILE%` on Windows) while
+the requested command continues. Set
+`IFHOST_AUTO_UPDATE_DEBUG=1` when you need the same failure on stderr; never
+treat a quiet background check as proof that an update was available or
+installed.
 
 ### ifhost billing (alias: sub)
 
@@ -854,7 +890,7 @@ itself — run its help rather than quoting a price:
 
 ```bash
 ifhost billing topup-traffic --help       # current rate, minimum, and step size
-export IFHOST_TOPUP_SIGNING_KEY=<hex private key of the paying wallet>
+test -n "$IFHOST_TOPUP_SIGNING_KEY"       # load it out-of-band; never type it into shell history
 ifhost billing topup-traffic <GB>         # cost is quoted before it charges
 ```
 
@@ -910,9 +946,10 @@ create it explicitly with `machines exec` or `machines write` before starting
 the process. Repeat that setup after a restart when the generated file is not
 under `/data`.
 
-**Secrets:** Pass via `--secret` on the deploy command, NOT in the toml file:
+**Secrets:** Pass a protected reference via `--secret`, not a literal value or
+a tracked TOML file:
 ```bash
-ifhost deploy --secret API_KEY=sk-... --secret BOT_TOKEN=123:ABC
+ifhost deploy --secret API_KEY=@env:API_KEY --secret BOT_TOKEN=@file:/run/secrets/bot-token
 ```
 
 ---
@@ -933,7 +970,7 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.imposs
 ### Heavy app (AI agent, ML model, slow boot)
 ```bash
 ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1 --storage local
-ifhost deploy --secret OPENAI_API_KEY=sk-...
+ifhost deploy --secret OPENAI_API_KEY=@env:OPENAI_API_KEY
 # Then drive the project's own install via exec/console (see Interactive setup)
 ```
 
@@ -961,8 +998,8 @@ NODE_ENV = "production"
 
 ```bash
 ifhost deploy \
-  --secret TELEGRAM_BOT_TOKEN=123456:ABC... \
-  --secret OPENAI_API_KEY=sk-... \
+  --secret TELEGRAM_BOT_TOKEN=@env:TELEGRAM_BOT_TOKEN \
+  --secret OPENAI_API_KEY=@env:OPENAI_API_KEY \
   --env TELEGRAM_CHAT_ID=623508703
 ifhost machines push ./ --to /data/app --app my-bot --yes-replace
 ifhost machines exec --app my-bot -- sh -c "cd /data/app && npm install"
@@ -1134,6 +1171,7 @@ ifhost agents status                    # all your agents
 ifhost agents status my-assistant       # one agent, with its verify result
 ifhost agents logs my-assistant         # its recent log, credentials redacted
 ifhost agents logs my-assistant --lines 500
+```
 
 **One line in that log looks like a break and is not.** Shortly after an agent
 starts you will see:
@@ -1152,6 +1190,8 @@ the panel is working correctly.
 
 Do not report this as a fault, do not tell the owner to reset anything, and do
 not rebuild the agent over it.
+
+```bash
 ifhost agents reconfigure my-assistant  # change model, keys or channel
 ifhost agents panel my-assistant --private   # take the control panel off the web
 ifhost agents panel my-assistant --public    # put it back
@@ -1257,9 +1297,9 @@ for weeks after the catalog moved, and called a capped limit unlimited.
 Read them live instead, from the source the biller itself uses:
 
 ```bash
-curl -s https://host.impossibuild.ai/billing/plans        # every plan, no auth needed
+curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/billing/plans  # every plan, no auth needed
 ifhost status                                              # the signed-in account's plan and usage
-curl -s https://host.impossibuild.ai/llms.txt              # agent guide, pricing block rendered from the catalog
+curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/llms.txt  # agent guide, pricing block rendered from the catalog
 ```
 
 Quote the account's own plan from `ifhost status`, never a remembered number.
