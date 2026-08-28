@@ -184,7 +184,7 @@ Even for a 2-step task ("install ifhost then login"), say so:
 ```
 Setting up ifhost — plan:
   Step 1/2: Install CLI                            (~15s)
-  Step 2/2: Login via Google                       (~30s, browser opens)
+  Step 2/2: Sign in                                (~30s, browser opens)
 Total: ~45s
 ```
 
