@@ -911,6 +911,15 @@ live at `/dashboard/app` under the plan card.
 payments are coming soon; crypto (USDC) works today. `--pay crypto` is a
 compatibility spelling that still lands on the same hosted checkout.
 
+Already subscribed? The same `ifhost billing subscribe <plan>` switches
+plans in place: an upgrade applies immediately and charges the saved
+payment method only the prorated difference for the rest of the paid
+period; a downgrade takes effect when the paid period ends and charges
+nothing until then. Leaving for free is `ifhost billing cancel`. Before a
+downgrade, run `ifhost billing fit <plan>` to see whether everything you
+run fits the target and what deleting each resource would free — apps that
+do not fit when the change lands are paused, newest first.
+
 ---
 
 ## impossible.toml Reference
