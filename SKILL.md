@@ -915,7 +915,10 @@ Already subscribed? The same `ifhost billing subscribe <plan>` switches
 plans in place: an upgrade applies immediately and charges the saved
 payment method only the prorated difference for the rest of the paid
 period; a downgrade takes effect when the paid period ends and charges
-nothing until then. Leaving for free is `ifhost billing cancel`. Before a
+nothing until then. An upgrade asks for confirmation with the estimated
+charge before anything is billed — in `--json` mode pass `--yes` to
+authorize it, or the switch is refused. Leaving for free is
+`ifhost billing cancel`. Before a
 downgrade, run `ifhost billing fit <plan>` to see whether everything you
 run fits the target and what deleting each resource would free — apps that
 do not fit when the change lands are paused, newest first.
