@@ -358,7 +358,7 @@ internal log messages.
 | Symptom | Likely meaning | Action |
 |---|---|---|
 | `404 page not found` before creation | The app name is probably unassigned, but this is not an availability guarantee | Confirm by creating the app; handle `name already taken` explicitly |
-| `name already taken` | App names are globally unique | Ask the user for another name |
+| `name already taken` | One name covers pages, apps and agents, so the holder may be any of the three, on any account including this one | Run `ifhost status` (apps and pages) and `ifhost agents list` first: if this account holds it, remove that or pick another name. Otherwise ask the user for a different name |
 | Deploy succeeds but URL fails | The runner exists but no app is listening | Install, transfer, start, and verify the process |
 | Persistent `502` | No listener, wrong port, loopback-only bind, or crashed process | Check the configured port, bind address, process, and recent logs |
 | Upload reports a rate-limit wait | The CLI exhausted the current request window | Let its bounded wait/resume finish; do not start a second manual retry loop |

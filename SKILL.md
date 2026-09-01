@@ -1097,8 +1097,11 @@ platform, so `spawn` can refuse for two opposite reasons:
 - `agent_name_yours` — you already have one by that name. Spawning again
   resumes that setup where it stopped; the refusal says what state it is in.
   Remove it instead with `ifhost agents destroy <name> --yes-irreversible`.
-- `agent_name_taken` — the name belongs to another account. Nothing you can
-  do but pick a different one.
+- `agent_name_taken` — the name is not available for an agent. A page, an app
+  and an agent each answer at `<name>.<our domain>`, so all three draw from one
+  set of names: the holder may be another account, or one of THIS account's own
+  pages or apps. Run `ifhost status`, which lists both, before telling the user
+  a stranger has it. Remove yours, or pick a different name.
 
 Spawning in a loop or in CI, use a name that carries the run into it
 (`ci-wa-<run-id>`) and destroy it in a step that always runs. A fixed name
