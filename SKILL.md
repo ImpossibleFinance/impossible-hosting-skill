@@ -777,6 +777,34 @@ exclusions such as `.git`, `node_modules`, and `.env*`, and skips symlinks and
 individual files larger than 50 MB. It checks target free space before upload.
 Never copy private Git credentials into the runner.
 
+### ifhost machines pull
+
+Download a directory from the running VM as a `.tar.gz` backup.
+
+```bash
+ifhost machines pull /data/app --app my-app                             # Prompts before downloading
+ifhost machines pull /data/app --to backup.tar.gz --yes-egress --app my-app   # Non-interactive
+```
+
+The download is METERED as outbound traffic on the account, the same as
+visitor traffic to the apps. Every pull first archives the directory on
+the VM and prints a manifest with the exact archive size, its SHA-256,
+and the account's current traffic standing — read it before approving.
+Nothing is downloaded or metered until approved.
+
+The confirmation prompt refuses in non-interactive sessions. Pass
+`--yes-egress` only after the manifest is acceptable; it is explicit
+consent to the metered traffic. Do not pass it habitually — on a large
+data directory the download can be a meaningful share of the month's
+allowance, and the manifest is where that is visible.
+
+The downloaded file is verified against the archive's SHA-256 and written
+atomically: an interrupted or corrupted download never replaces an
+existing file. If a pull is interrupted, rerun the same command. Archives
+are staged under the VM's `/tmp`, so the VM needs about the directory's
+size in free space; if archiving fails or times out, pull a smaller
+subdirectory instead.
+
 ### ifhost machines wait-for
 
 Block until a substring appears in a file inside the VM. Useful for waiting on app readiness.
