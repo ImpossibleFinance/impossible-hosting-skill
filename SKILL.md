@@ -1235,8 +1235,20 @@ not rebuild the agent over it.
 ifhost agents reconfigure my-assistant  # change model, keys or channel
 ifhost agents panel my-assistant --private   # take the control panel off the web
 ifhost agents panel my-assistant --public    # put it back
+ifhost agents pull my-assistant              # download its memory as a backup
 ifhost agents destroy my-assistant --yes-irreversible
 ```
+
+`agents pull` archives the agent's state (memory, conversations,
+workspace) LIVE — the agent keeps running — and downloads it as a
+tar.gz, SHA-256 verified. The download is METERED as outbound traffic,
+exactly like `machines pull`: the exact size and the account's traffic
+standing print first, nothing is downloaded or metered until approved,
+and `--yes-egress` is the explicit non-interactive consent. Key material
+is left out by the recipe, so the archive is safe to store; restoring
+elsewhere means re-entering provider keys and re-pairing channels. Pull
+a backup BEFORE `agents destroy` — destroy deletes the machine and
+everything the agent remembers.
 
 Spawn is not finished when the machine boots. The platform runs the recipe's
 own verify probe — it asks the agent a real question and waits for a real
