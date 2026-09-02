@@ -1272,6 +1272,31 @@ status come back. Captured output is limited to about 24 KB and one run
 to ten minutes (`--timeout`, default 120 s); start anything longer
 detached and poll, or use `agents ssh`, which streams without limit.
 
+### An OpenClaw agent that thinks through Claude Code (`claude -p`)
+
+OpenClaw can use Claude Code itself as its brain, signed in with the
+owner's Claude subscription — nothing billed separately. It is a choice
+of the `llm` question, so it is set up like any other provider:
+
+```bash
+# the owner runs this on THEIR computer, where Claude Code is signed in:
+#   claude setup-token        → prints a long token once
+export CLAUDE_CODE_OAUTH_TOKEN=...      # in your shell, never in argv
+ifhost agents spawn openclaw --name my-claw \
+  --choose channel=telegram --choose llm=claude-code \
+  --set CLAUDE_MODEL=claude-opus-5 \
+  --set-from-env TELEGRAM_BOT_TOKEN --set-from-env TELEGRAM_ALLOWED_USERS \
+  --set-from-env CLAUDE_CODE_OAUTH_TOKEN
+```
+
+The recipe installs Claude Code into the agent's own storage on first boot
+(so it survives every restart and reconfigure), points the agent at the
+`claude-cli` runtime for `anthropic/<model>`, and the token travels in the
+agent's environment like any other key. The verify checkup then asks the
+agent a real question through it. The token is the owner's — treat it as
+you treat their password: it comes from their machine, and it is never
+something you mint or type for them.
+
 This is your own ssh client, so everything after `--` is a remote command
 and its exit status comes back to you — the unattended path. Nothing on the
 machine listens for it: your public key (made once, in `~/.impossible/ssh/`)
