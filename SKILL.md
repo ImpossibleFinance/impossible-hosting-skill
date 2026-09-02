@@ -1261,7 +1261,16 @@ ifhost agents ssh my-assistant -- docker ps         # run one command and exit
 ifhost agents ssh my-assistant -- docker exec agent sh -c 'ls /opt/data'
 ifhost agents ssh my-assistant --print-config >> ~/.ssh/config   # once
 scp file.txt my-assistant.agent.ifhost:                          # then any ssh tool
+ifhost agents exec my-assistant -- docker ps                     # no ssh client needed
+ifhost agents exec my-assistant --in-agent -- openclaw config get agents.defaults.model
 ```
+
+`agents exec` is the shape for you: no ssh client, no key, no terminal — the
+command goes over the platform's own channel, runs as root on the machine
+(`--in-agent`: inside the agent's container), and its output and exit
+status come back. Captured output is limited to about 24 KB and one run
+to ten minutes (`--timeout`, default 120 s); start anything longer
+detached and poll, or use `agents ssh`, which streams without limit.
 
 This is your own ssh client, so everything after `--` is a remote command
 and its exit status comes back to you — the unattended path. Nothing on the
