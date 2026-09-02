@@ -1253,6 +1253,30 @@ elsewhere means re-entering provider keys and re-pairing channels. Pull
 a backup BEFORE `agents destroy` — destroy deletes the machine and
 everything the agent remembers.
 
+### A shell on the agent's machine
+
+```bash
+ifhost agents ssh my-assistant                      # interactive shell
+ifhost agents ssh my-assistant -- docker ps         # run one command and exit
+ifhost agents ssh my-assistant -- docker exec agent sh -c 'ls /opt/data'
+ifhost agents ssh my-assistant --print-config >> ~/.ssh/config   # once
+scp file.txt my-assistant.agent.ifhost:                          # then any ssh tool
+```
+
+This is your own ssh client, so everything after `--` is a remote command
+and its exit status comes back to you — the unattended path. Nothing on the
+machine listens for it: your public key (made once, in `~/.impossible/ssh/`)
+is accepted for sixty seconds per connection and the connection rides a
+tunnel the platform opens, so there is no port to find, no key on the
+machine to rotate, and the session is encrypted end to end by ssh. The
+agent itself runs in a container called `agent`; `docker exec -it agent sh`
+gets inside it, and its state lives on the machine under `/state`.
+
+Needs the agent to be `running`, and an `ssh` binary where the CLI runs.
+Whatever you change on the machine by hand is yours: the next
+`reconfigure` rewrites the environment file and replaces the container,
+and the verify checkup still reports on the result.
+
 Spawn is not finished when the machine boots. The platform runs the recipe's
 own verify probe — it asks the agent a real question and waits for a real
 answer — and only then reports `running`. `spawn` already waits for that, so
