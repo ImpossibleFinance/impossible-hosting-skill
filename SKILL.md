@@ -13,38 +13,202 @@ ordered deployment and recovery procedure.
 
 ### 0. Refresh the CLI and these instructions first, every session
 
-The platform evolves quickly. Before ANY ifhost work, install the CLI if it is
-missing; otherwise invoking it performs its signature-verified automatic update.
-Then sync the latest skill bundle:
+<!-- BEGIN VERIFIED CLI BOOTSTRAP -->
+When `ifhost` is missing, do not execute either installer served by the release
+origin. A compromise of that origin could replace the installer and the public
+key embedded in it.
+Instead, authenticate the signed release record with the public key committed
+in [`release-signers`](release-signers), inspect the authenticated metadata,
+verify the selected archive digest, and only then execute the CLI. Never
+download or replace the trust anchor from the release origin.
+
+On macOS or Linux:
 
 ```bash
-if ! command -v ifhost >/dev/null 2>&1; then
-  installer="$(mktemp)"
-  curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
-    --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
-    https://host.impossibuild.ai/install -o "$installer" &&
-    cat "$installer" && sh "$installer"
-  rc=$?; rm -f "$installer"; [ "$rc" -eq 0 ] || exit "$rc"
+set -eu
+release_origin=https://host.impossibuild.ai
+allowed_signer='ifhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ'
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+
+case "$(uname -s):$(uname -m)" in
+  Darwin:x86_64) archive=ifhost_darwin_amd64.tar.gz ;;
+  Darwin:arm64|Darwin:aarch64) archive=ifhost_darwin_arm64.tar.gz ;;
+  Linux:x86_64|Linux:amd64) archive=ifhost_linux_amd64.tar.gz ;;
+  Linux:arm64|Linux:aarch64) archive=ifhost_linux_arm64.tar.gz ;;
+  *) echo "Unsupported platform: $(uname -s)/$(uname -m)" >&2; exit 1 ;;
+esac
+for tool in curl ssh-keygen tar awk wc; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "Missing required tool: $tool" >&2; exit 1; }
+done
+
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+  --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  "$release_origin/dl/release.txt" -o "$tmp/release.txt"
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+  --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
+  "$release_origin/dl/release.txt.sshsig" -o "$tmp/release.txt.sshsig"
+[ "$(wc -c < "$tmp/release.txt")" -le 1048576 ] || {
+  echo "Release metadata exceeds 1 MiB" >&2; exit 1;
+}
+[ "$(wc -c < "$tmp/release.txt.sshsig")" -le 1048576 ] || {
+  echo "Release signature exceeds 1 MiB" >&2; exit 1;
+}
+printf '%s\n' "$allowed_signer" > "$tmp/release-signers"
+ssh-keygen -Y verify -f "$tmp/release-signers" -I ifhost -n ifhost-release \
+  -s "$tmp/release.txt.sshsig" < "$tmp/release.txt"
+cat "$tmp/release.txt"
+
+signed_value() {
+  key=$1
+  count=$(awk -F= -v key="$key" '$1 == key { count++ } END { print count+0 }' "$tmp/release.txt")
+  [ "$count" -eq 1 ] || { echo "Signed release must contain exactly one $key" >&2; return 1; }
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print }' "$tmp/release.txt"
+}
+source_repository=$(signed_value source_repository)
+expected=$(signed_value "artifact.$archive")
+[ "$source_repository" = ImpossibleFinance/impossible-hosting ] || {
+  echo "Signed release names an unexpected source repository" >&2; exit 1;
+}
+case "$expected" in *[!0-9a-f]*|'') echo "Signed digest is malformed" >&2; exit 1 ;; esac
+[ "${#expected}" -eq 64 ] || { echo "Signed digest is malformed" >&2; exit 1; }
+
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+  --tlsv1.2 --connect-timeout 10 --max-time 300 --max-filesize 67108864 \
+  "$release_origin/dl/$archive" -o "$tmp/$archive"
+[ "$(wc -c < "$tmp/$archive")" -le 67108864 ] || {
+  echo "Release archive exceeds 64 MiB" >&2; exit 1;
+}
+if command -v sha256sum >/dev/null 2>&1; then
+  actual=$(sha256sum "$tmp/$archive" | awk '{ print $1 }')
+elif command -v shasum >/dev/null 2>&1; then
+  actual=$(shasum -a 256 "$tmp/$archive" | awk '{ print $1 }')
+else
+  echo "Missing SHA-256 tool (sha256sum or shasum)" >&2
+  exit 1
 fi
+[ "$actual" = "$expected" ] || { echo "Release digest mismatch; nothing installed" >&2; exit 1; }
+contents=$(tar -tzf "$tmp/$archive")
+printf 'Verified archive contents:\n%s\n' "$contents"
+[ "$contents" = ifhost ] || { echo "Release archive must contain only ifhost" >&2; exit 1; }
+tar -xzf "$tmp/$archive" -C "$tmp"
+[ -f "$tmp/ifhost" ] && [ ! -L "$tmp/ifhost" ] || {
+  echo "Release binary is not a regular file" >&2; exit 1;
+}
+mkdir -p "$HOME/.local/bin"
+install -m 0755 "$tmp/ifhost" "$HOME/.local/bin/ifhost"
+export PATH="$HOME/.local/bin:$PATH"
 ifhost version
 ifhost skill sync
 ```
 
-On Windows, use the same download-inspect-execute boundary in PowerShell:
+On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
-if (-not (Get-Command ifhost -ErrorAction SilentlyContinue)) {
-  $installer = Join-Path ([IO.Path]::GetTempPath()) "ifhost-install-$([guid]::NewGuid()).ps1"
-  try {
-    Invoke-WebRequest -Uri https://host.impossibuild.ai/install.ps1 `
-      -MaximumRedirection 0 -TimeoutSec 60 -OutFile $installer
-    Get-Content $installer
-    & $installer
-  } finally { Remove-Item $installer -ErrorAction SilentlyContinue }
+$ErrorActionPreference = 'Stop'
+$ReleaseOrigin = 'https://host.impossibuild.ai'
+$AllowedSigner = 'ifhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ'
+$RawArch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+$Arch = switch ($RawArch) {
+  'AMD64' { 'amd64' }
+  'ARM64' { 'arm64' }
+  default { throw "Unsupported architecture: $RawArch" }
 }
-ifhost version
-ifhost skill sync
+$Archive = "ifhost_windows_$Arch.zip"
+$TempDir = Join-Path ([IO.Path]::GetTempPath()) "ifhost-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $TempDir | Out-Null
+
+function Get-SignedValue([string[]]$Lines, [string]$Name) {
+  $Prefix = "$Name="
+  $Matches = @($Lines | Where-Object { $_.StartsWith($Prefix, [StringComparison]::Ordinal) })
+  if ($Matches.Count -ne 1) { throw "Signed release must contain exactly one $Name" }
+  $Matches[0].Substring($Prefix.Length)
+}
+
+try {
+  $ReleasePath = Join-Path $TempDir 'release.txt'
+  $SignaturePath = Join-Path $TempDir 'release.txt.sshsig'
+  $SignerPath = Join-Path $TempDir 'release-signers'
+  Invoke-WebRequest -Uri "$ReleaseOrigin/dl/release.txt" `
+    -MaximumRedirection 0 -TimeoutSec 60 -OutFile $ReleasePath
+  Invoke-WebRequest -Uri "$ReleaseOrigin/dl/release.txt.sshsig" `
+    -MaximumRedirection 0 -TimeoutSec 60 -OutFile $SignaturePath
+  if ((Get-Item -LiteralPath $ReleasePath).Length -gt 1048576 -or
+      (Get-Item -LiteralPath $SignaturePath).Length -gt 1048576) {
+    throw 'Release metadata exceeds 1 MiB'
+  }
+  [IO.File]::WriteAllText($SignerPath, "$AllowedSigner`n", [Text.UTF8Encoding]::new($false))
+
+  $SshKeygen = (Get-Command ssh-keygen -ErrorAction Stop).Source
+  $Start = [Diagnostics.ProcessStartInfo]::new()
+  $Start.FileName = $SshKeygen
+  $Start.Arguments = "-Y verify -f `"$SignerPath`" -I ifhost -n ifhost-release -s `"$SignaturePath`""
+  $Start.UseShellExecute = $false
+  $Start.RedirectStandardInput = $true
+  $Start.RedirectStandardOutput = $true
+  $Start.RedirectStandardError = $true
+  $Process = [Diagnostics.Process]::new()
+  $Process.StartInfo = $Start
+  [void]$Process.Start()
+  $ReleaseBytes = [IO.File]::ReadAllBytes($ReleasePath)
+  $Process.StandardInput.BaseStream.Write($ReleaseBytes, 0, $ReleaseBytes.Length)
+  $Process.StandardInput.Close()
+  $Stdout = $Process.StandardOutput.ReadToEnd()
+  $Stderr = $Process.StandardError.ReadToEnd()
+  $Process.WaitForExit()
+  if ($Process.ExitCode -ne 0) { throw "Release signature verification failed: $Stderr" }
+
+  Get-Content -LiteralPath $ReleasePath
+  $Lines = [IO.File]::ReadAllLines($ReleasePath)
+  $SourceRepository = Get-SignedValue $Lines 'source_repository'
+  $Expected = Get-SignedValue $Lines "artifact.$Archive"
+  if ($SourceRepository -cne 'ImpossibleFinance/impossible-hosting') {
+    throw 'Signed release names an unexpected source repository'
+  }
+  if ($Expected -cnotmatch '^[0-9a-f]{64}$') { throw 'Signed digest is malformed' }
+
+  $ZipPath = Join-Path $TempDir $Archive
+  Invoke-WebRequest -Uri "$ReleaseOrigin/dl/$Archive" `
+    -MaximumRedirection 0 -TimeoutSec 300 -OutFile $ZipPath
+  if ((Get-Item -LiteralPath $ZipPath).Length -gt 67108864) {
+    throw 'Release archive exceeds 64 MiB'
+  }
+  $Actual = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($Actual -cne $Expected) { throw 'Release digest mismatch; nothing installed' }
+
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $Zip = [IO.Compression.ZipFile]::OpenRead($ZipPath)
+  try {
+    $Files = @($Zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
+    $Files | ForEach-Object { Write-Host "Verified archive content: $($_.FullName)" }
+    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'ifhost.exe') {
+      throw 'Release archive must contain only ifhost.exe'
+    }
+    $UnixType = (($Files[0].ExternalAttributes -shr 16) -band 0xF000)
+    if ($UnixType -ne 0 -and $UnixType -ne 0x8000) {
+      throw 'Release archive entry must be a regular file'
+    }
+  } finally {
+    $Zip.Dispose()
+  }
+
+  $Unpacked = Join-Path $TempDir 'unpacked'
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $Unpacked
+  $InstallDir = Join-Path $env:LOCALAPPDATA 'ifhost'
+  New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+  Move-Item -LiteralPath (Join-Path $Unpacked 'ifhost.exe') `
+    -Destination (Join-Path $InstallDir 'ifhost.exe') -Force
+  $env:Path = "$InstallDir;$env:Path"
+  ifhost version
+  ifhost skill sync
+} finally {
+  Remove-Item -LiteralPath $TempDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 ```
+<!-- END VERIFIED CLI BOOTSTRAP -->
+
+When `ifhost` already exists, skip the bootstrap and run `ifhost version`
+followed by `ifhost skill sync`.
 
 `skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
 paths. If this file was loaded from another path, read those refreshed files
@@ -262,32 +426,25 @@ flags. Do not infer runner lifecycle from generic examples in help output:
 
 ## Install / Update
 
-```bash
-installer="$(mktemp)"
-curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
-  --tlsv1.2 --connect-timeout 10 --max-time 60 --max-filesize 1048576 \
-  https://host.impossibuild.ai/install -o "$installer"
-cat "$installer"
-sh "$installer"
-rm -f "$installer"
-```
+When `ifhost` is missing, use the signed-channel bootstrap in Rule 0 exactly as
+written. Do not substitute either release-origin installer, another public
+key, an unsigned archive, or a checksum that is not authenticated by the
+SSHSIG release record.
 
-Run this at the start of EVERY session, not just the first (Rule 0) — it
-updates an existing binary in place. It downloads the correct binary for the
-current OS/architecture (macOS/Linux/Windows, amd64/arm64)
-and installs it to `~/.local/bin/ifhost`. If `~/.local/bin` is not in PATH, add it:
+For an existing installation, invoking `ifhost` performs its independently
+signed automatic update check. Run this at the start of every session:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+ifhost version
+ifhost skill sync
 ```
 
-On Windows, use the PowerShell block from the session-start section above: it
-installs `%LOCALAPPDATA%\ifhost\ifhost.exe`, adds that folder to the user PATH
-itself (open a new terminal afterwards), and verifies the release signature
-with `ssh-keygen` from the OpenSSH Client — if the installer reports that
-missing, run `Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0`
-in an elevated PowerShell and retry. Environment variables are set with
-`$env:NAME = "value"` there, not `export`.
+On macOS/Linux, add `~/.local/bin` to PATH if needed. On Windows, the Rule 0
+PowerShell block adds `%LOCALAPPDATA%\ifhost` to the current process PATH; add
+that directory to the user PATH for future terminals. If OpenSSH Client is
+missing, run `Add-WindowsCapability -Online -Name
+OpenSSH.Client~~~~0.0.1.0` in an elevated PowerShell, then repeat the verified
+bootstrap.
 
 Verify installation:
 
@@ -295,9 +452,8 @@ Verify installation:
 ifhost --help
 ```
 
-If the installer fails, do not bypass its signature check with a direct
-archive pipe. Follow the signed manual-download procedure in the
-[`impossible-hosting-cli` repository](https://github.com/ImpossibleFinance/impossible-hosting-cli#manual-download).
+If any signature or digest check fails, stop without installing. Do not bypass
+the Rule 0 trust anchor or use a direct archive pipe.
 
 ## Quick Start
 
@@ -324,8 +480,8 @@ always be started again.
 ```bash
 ifhost deploy --secret KEY=@env:KEY --yes
 ifhost machines console start --app <app> -- bash
-# download and inspect upstream installers before executing them, then configure
-# and launch the daemon in detached tmux inside /data
+# download, authenticate against an upstream-published key or pinned digest,
+# and inspect upstream installers before executing; never run unauthenticated code
 ```
 
 See "Interactive setup" in Common Deployment Patterns for the full console workflow.
@@ -368,7 +524,7 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impos
   ifhost machines install --app X curl xz-utils procps git
   ```
   Discovering each missing tool one failure at a time wastes 30s+ per round trip.
-- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before running a downloaded and inspected installer.
+- **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before running an authenticated and inspected installer.
 - **tmux `new-session "<cmd>"` does NOT inherit exported PATH.** The spawned shell starts fresh. Use absolute paths or set an explicit administrative `PATH` inside `/bin/sh`; do not assume `bash -lc` exists.
 - **Drive interactive wizards, don't bypass them.** If a project ships a `setup` / `init` / `configure` wizard, run it and drive it via console. Killing it with Ctrl+C and reverse-engineering the config layout burns 10x more tokens than just answering arrow-key prompts.
 - **Read the project's provider/config source before guessing IDs.** Hermes's `auth add` rejects bare `"openai"` because their `providers.py` routes that to OpenRouter; valid options are listed only in the wizard. `grep -n 'provider' /path/to/providers.py` takes 5 seconds; guessing 6 wrong IDs takes 5 minutes.
