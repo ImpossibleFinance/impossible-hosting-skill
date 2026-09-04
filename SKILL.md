@@ -253,6 +253,26 @@ start the app again, and repeat the public HTTP check.
 If unattended automatic recovery after a machine restart is a requirement,
 stop and report it as unsupported by the current runner workflow.
 
+### 0c. Cookie-based authentication on an ifhost URL
+
+When an application uses a browser cookie for sign-in or authorization on its
+ifhost-provided URL, configure the application or framework itself so that:
+
+- the exact session-cookie name begins with `__Host-`;
+- the cookie uses `Secure`, `HttpOnly`, and an explicit `Path=/`;
+- the cookie has no `Domain` attribute; and
+- the server accepts only that exact cookie name, with no unprefixed fallback.
+
+Do not rename or rewrite a customer's cookies at the proxy. The application
+owns its cookie semantics and must opt into this contract explicitly.
+
+For static publishing, the publish result warns when the uploaded HTML directly
+references the browser cookie APIs. Treat that as a review prompt, not a
+complete scan: runtime and externally loaded scripts may not be visible. A
+static page cannot create an `HttpOnly` cookie from JavaScript; cookie-based
+authentication for a static page therefore needs a backend or authentication
+provider to issue it.
+
 ### 1. Understand the project BEFORE deploying
 
 **CRITICAL:** Before running `ifhost init` or `ifhost deploy`, complete this checklist:
