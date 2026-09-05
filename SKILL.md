@@ -1065,7 +1065,8 @@ ifhost billing status                     # Current subscription status
 ifhost billing subscribe hobby            # Subscribe to a plan (hobby, pro, team)
 ifhost billing subscribe --plan pro --pay crypto   # Specify payment method
 ifhost billing cancel                     # Cancel subscription
-ifhost billing invoices                   # Billing history
+ifhost billing cancel-change              # Call off a queued plan change, keep the current plan
+ifhost billing invoices                   # Payments: what the card was charged, and when
 ifhost billing plan                       # Show current plan and usage
 ifhost billing alert set --max 20         # Set spend alert at $20
 ifhost billing alert show                 # Show current alert
@@ -1122,7 +1123,8 @@ period; a downgrade takes effect when the paid period ends and charges
 nothing until then. An upgrade asks for confirmation with the estimated
 charge before anything is billed — in `--json` mode pass `--yes` to
 authorize it, or the switch is refused. Leaving for free is
-`ifhost billing cancel`. Before a
+`ifhost billing cancel`. A queued downgrade can be called off before it lands
+with `ifhost billing cancel-change`, which keeps the current plan. Before a
 downgrade, run `ifhost billing fit <plan>` to see whether everything you
 run fits the target and what deleting each resource would free — apps that
 do not fit when the change lands are paused, newest first.
