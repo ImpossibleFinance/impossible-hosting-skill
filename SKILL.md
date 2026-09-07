@@ -716,7 +716,9 @@ Output includes:
 - Environment variables (values truncated at 30 chars)
 - Secret key names (values hidden)
 - Custom domains with TLS status
-- Last 5 deployments with status and timestamps
+- Last 5 deployments with status and timestamps. A completed runner deployment
+  reports `staged`: the machine is ready for setup, not proof that an app is
+  serving. Install/start the app and verify its URL separately.
 
 ---
 
@@ -814,6 +816,10 @@ ifhost machines console end --app my-app <session-id>
 
 ### ifhost machines env / secrets
 
+**API parity:** Environment and secret writes/deletes also save without
+restarting. Use `?restart=true` only when an immediate restart is intended.
+The dashboard Settings action uses the same endpoints and defaults.
+
 **Important:** `env set` and `secrets set` do NOT restart the machine by
 default. Configure them before starting the app when possible. If you pass
 `--restart` or run `machines restart`, start the application again afterward
@@ -844,6 +850,9 @@ ifhost machines volumes rm my-data --app my-app --yes
 **Volumes are per-machine** (one machine, one disk). Shared volumes are on
 the roadmap; for shared state today use a managed database.
 
+Growing an attached volume makes the new space available online; a restart
+is not required. New volumes still need a deployment to attach them.
+
 ### ifhost machines domains
 
 ```bash
@@ -857,9 +866,9 @@ ifhost machines domains rm myapp.com --app my-app       # Remove custom domain
 its DNS. It prints the two records to add — a CNAME from the hostname to
 the platform (an ALIAS at a bare domain) and one TXT proof record
 (`_hostimpossibuild-verify.<hostname>`), values from the command output —
-and waits up to two minutes for the proof to appear; if it gives up, add
-the records, wait a minute, and run the same command again — it picks up
-where it left off. There are no address records to add. Tell the user to
+and exits with a pending-verification result. Add the records, then run
+the same command again to finish claiming the hostname. Pass `--wait` to
+wait up to two minutes for the proof to appear. There are no address records to add. Tell the user to
 keep the TXT record after setup.
 
 DNS requirements are returned by the current platform and may change. Never
@@ -1016,7 +1025,7 @@ ifhost apply --app my-app
 ```bash
 ifhost tokens create --name "ci-bot"     # Create a new API token (default name: "cli")
 ifhost tokens list                       # List all API tokens
-ifhost tokens revoke <token-id>          # Revoke a token
+ifhost tokens revoke <token-id> --yes    # Revoke a token without a prompt
 ```
 
 Use tokens for CI pipelines or agent auth without putting the credential in an
