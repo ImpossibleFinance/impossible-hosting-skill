@@ -703,7 +703,7 @@ check with `ifhost machines domains list --app <name>`.
 
 ### ifhost describe --app \<name\>
 
-Full app context in one call. Aggregates: app status, machines, env vars, secrets, domains, and recent deploys.
+Full app context in one call. Aggregates: app status, machines, env vars, secret key names, domains, persistent volumes, recent deploys, and recent platform logs.
 
 ```bash
 ifhost describe --app my-app         # Human-readable summary
@@ -716,6 +716,12 @@ Output includes:
 - Environment variables (values truncated at 30 chars)
 - Secret key names (values hidden)
 - Custom domains with TLS status
+- Persistent volumes with size, mount path and status
+- Up to 20 recent platform log entries from a non-following read; JSON includes
+  `logs_truncated` when earlier returned entries were omitted. A failed or malformed
+  log read, or a failed volume read, fails the description instead of printing a
+  misleading complete report. These are platform logs, not arbitrary files inside
+  a runner.
 - Last 5 deployments with status and timestamps. A completed runner deployment
   reports `staged`: the machine is ready for setup, not proof that an app is
   serving. Install/start the app and verify its URL separately.
