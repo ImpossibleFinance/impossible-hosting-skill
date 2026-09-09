@@ -1020,7 +1020,9 @@ ifhost machines destroy --yes-irreversible <machine-id> --app my-app   # Delete 
 
 ### ifhost apply
 
-Push current config (memory, cpus, env, secrets, services) to existing machines without redeploying.
+Push stored CPU, memory, environment and secret configuration to existing machines without rebuilding. Apply preserves each machine's image, service configuration and volume mounts. When `impossible.toml` supplies resource settings, the CLI saves those settings before applying them.
+
+Inspect `applied` and `failed_machines` in JSON output. Partial failures return HTTP 207 and the CLI currently exits zero while listing the failures; exit zero alone does not establish that every machine was updated. Retry the failed rollout and verify the application process and public URL after the machine transition completes.
 
 ```bash
 ifhost apply --app my-app
