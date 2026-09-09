@@ -1510,7 +1510,11 @@ Spawn is not finished when the machine boots. The platform runs the recipe's
 own verify probe — it asks the agent a real question and waits for a real
 answer — and only then reports `running`. `spawn` already waits for that, so
 its success means the agent genuinely replied, not merely that a machine
-exists. Treat `verify-failed` as "a key was rejected", not as a crash.
+exists. The probe can also check the messaging gateway and public control
+panel. `verify-failed` means a verification check failed; it does not identify
+the cause. Read the report printed by spawn, or run `ifhost agents status <name>`,
+before changing credentials or restarting the agent. Follow the failed check's
+recovery instructions.
 
 ### Traps
 
