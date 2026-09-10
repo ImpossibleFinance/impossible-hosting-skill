@@ -958,8 +958,9 @@ accepts `--machine`; `push` does not.
 
 Pause processes that can write project state before pushing, then restart them
 after deployment. File copying is not an application-consistent database backup.
-Detected open protected state prevents replacement; `--override-running` does
-not bypass this safeguard.
+If push reports open protected state, pause those processes before retrying.
+`--override-running` only allows protected archive entries; it does not make
+live state safe to replace.
 
 Before `push`, create `.ifhost-state-paths` in the local source root with
 relative paths the running app owns, one per line (for example
