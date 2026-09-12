@@ -219,6 +219,12 @@ slightly stale bundle is safe; guessed instructions are not.
 Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 `ifhost update` remains available for an explicit update.
 
+### Public URLs
+
+Use the exact public URL returned by `ifhost deploy`, `ifhost publish`, or the resource listing. New apps, static sites, and agent panels receive an assigned `*.fly.dev` URL. The project name does not determine that hostname. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://host.impossibuild.ai`.
+
+In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Never guess it from the app name. Agent compute stays on AWS behind its assigned public gateway.
+
 ### 0b. Deploy ≠ live — never declare success without a 200
 
 `ifhost deploy` succeeding means the VM is provisioned, NOTHING more. The
@@ -227,7 +233,7 @@ ready — your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
    `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
-2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://<app>.host.impossibuild.ai/`
+2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"`
    printed `200` (or the app's health endpoint did)
 
 Until then, NEVER tell the user "deployed", "live", or "running" — a
@@ -412,7 +418,7 @@ Implications for you as the agent driving the deploy:
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
-**Hard rule:** the deploy is DONE when `curl --fail --show-error --max-time 30 https://<app>.host.impossibuild.ai/healthz` returns 200
+**Hard rule:** the deploy is DONE when `curl --fail --show-error --max-time 30 "${IFHOST_PUBLIC_URL}/healthz"` returns 200
 (or the app's equivalent health endpoint). Internal subsystems (Telegram polling, Discord
 WebSocket, agent initialization) may take another 30-90 seconds to come up — that's the
 APP's problem, not the deploy.
@@ -534,7 +540,7 @@ ifhost machines install --app my-site python3
 printf '%s\n' 'state/data.db' > .ifhost-state-paths  # only when the app owns this runtime path
 ifhost machines push ./ --to /data/app --app my-site --yes-replace
 ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-site.host.impossibuild.ai/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"   # must print 200
 ```
 
 **Gotchas that burn tokens on runner deploys (learned the hard way):**
@@ -587,13 +593,13 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://my-api.host.impossibuild.ai
+    URL:     https://ifh-app-0123456789abcdef0123456789abcdef.fly.dev
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
 
   my-site
-    URL:     https://my-site.host.impossibuild.ai
+    URL:     https://ifh-site-fedcba9876543210fedcba9876543210.fly.dev
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -613,7 +619,7 @@ ifhost init --app <name> --port <port> --memory <mb> [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--app` | (required) | App name — becomes `<name>.host.impossi.build` |
+| `--app` | (required) | Resource name. Use the assigned public URL returned by the CLI |
 | `--port` | 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
@@ -651,7 +657,7 @@ Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
 
 **After deploy:** Prints the public URL (e.g.,
-`https://my-app.host.impossibuild.ai`). The application is not live until you
+`https://ifh-app-0123456789abcdef0123456789abcdef.fly.dev`). The application is not live until you
 start it and verify HTTP `200`.
 
 #### Redeploying is safe — the app keeps its address
@@ -1205,7 +1211,7 @@ ifhost machines install --app my-api curl git nodejs npm
 ifhost machines push ./ --to /data/app --app my-api --yes-replace
 ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
 ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
-curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://my-api.host.impossibuild.ai/   # must print 200
+curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"   # must print 200
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)

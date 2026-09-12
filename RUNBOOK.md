@@ -489,23 +489,25 @@ change that restarts the machine, or redeploy, then:
 
 ## 7. Verify the public routes
 
+Set `IFHOST_PUBLIC_URL` to the exact public URL returned by the CLI, without a trailing slash. New resources use assigned `*.fly.dev` hostnames. Preserve existing shared-host and custom-domain URLs. Do not construct a hostname from the app name.
+
 Test the health or root route first:
 
 ```bash
 curl -sS -o /dev/null \
   -w "%{http_code} %{content_type} %{size_download}\n" \
   --max-time 30 \
-  https://<app-name>.host.impossibuild.ai/
+  "${IFHOST_PUBLIC_URL}/"
 ```
 
 Then test representative routes and important assets:
 
 ```bash
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 30 \
-  https://<app-name>.host.impossibuild.ai/docs/
+  "${IFHOST_PUBLIC_URL}/docs/"
 
 curl -sS -o /dev/null -w "%{http_code}\n" --max-time 30 \
-  https://<app-name>.host.impossibuild.ai/assets/app.js
+  "${IFHOST_PUBLIC_URL}/assets/app.js"
 ```
 
 For a static site, verify at least:

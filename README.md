@@ -251,9 +251,10 @@ $ ifhost init --app my-api --port 3000 --memory 512
 $ ifhost deploy --secret DATABASE_URL=@env:DATABASE_URL
 $ ifhost machines push . --to /data/app --app my-api --yes-replace
 $ ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup <start-command> </dev/null > /tmp/app.log 2>&1 &"
-$ curl --fail --silent --show-error --max-time 30 https://my-api.host.impossibuild.ai/
+$ # Set IFHOST_PUBLIC_URL to the exact URL returned by deploy.
+$ curl --fail --silent --show-error --max-time 30 "${IFHOST_PUBLIC_URL}/"
 
-Agent: The app returned HTTP 200 and is live at https://my-api.host.impossibuild.ai
+Agent: The app returned HTTP 200 at its assigned public URL.
 ```
 
 ## Links
