@@ -575,7 +575,11 @@ already logged in, the account picker still lets you switch or add an account.
 |------|-------------|
 | `--token -` | Read an API token from stdin; literal values are refused so they cannot leak through argv or shell history |
 | `--from-file <path>` | Read the token from a local secret file (`-` = stdin) — avoids shell history and `ps` exposure |
-| `--switch` | Switch between existing accounts |
+| `--switch` | Select a saved account |
+
+If `IMPOSSIBLE_API_TOKEN` is set, requests use that token instead of saved
+credentials. `--switch` still selects a saved account; unset the override only
+when you intend subsequent commands to use that account.
 
 ### ifhost logout
 
