@@ -1,9 +1,9 @@
 ---
 name: ifhost
-description: Deploy applications to Impossible Hosting runner VMs. Use when Codex needs to provision an app with ifhost, translate project setup into runner commands, transfer source safely, start the process, or verify and troubleshoot the public deployment.
+description: Deploy applications to Innstance runner VMs. Use when Codex needs to provision an app with ifhost, translate project setup into runner commands, transfer source safely, start the process, or verify and troubleshoot the public deployment.
 ---
 
-# ifhost — Deploy to Impossible Hosting
+# ifhost — Deploy to Innstance
 
 Provision an isolated runner VM and HTTPS URL, then install, transfer, start,
 and verify the application explicitly. Use [RUNBOOK.md](RUNBOOK.md) for the
@@ -259,7 +259,7 @@ start the app again, and repeat the public HTTP check.
 If unattended automatic recovery after a machine restart is a requirement,
 stop and report it as unsupported by the current runner workflow.
 
-### 0c. Cookie-based authentication on an ifhost URL
+### 0c. Cookie-based authentication on an Innstance URL
 
 When an application uses a browser cookie for sign-in or authorization on its
 ifhost-provided URL, configure the application or framework itself so that:
@@ -335,7 +335,7 @@ project; they haven't. Accepting defaults should be a one-word reply ("go", "ok"
   but do not ask the user to paste secret values into chat.
 - Have the user expose each value through an environment variable, a protected
   local file, or stdin. Pass only a reference such as `KEY=@env:KEY`,
-  `KEY=@file:/run/secrets/key`, or `KEY=@stdin` to ifhost.
+  `KEY=@file:/run/secrets/key`, or `KEY=@stdin` to Innstance.
 - Never guess credentials or place them in `impossible.toml`, a command
   argument, a transcript, or a source archive.
 - Model preferences (which AI model to use, if applicable)
@@ -359,7 +359,7 @@ it'll take ~X minutes.
 Before running ANY ifhost command that takes more than a few seconds, print:
 
 ```
-Deploying my-app to ifhost — plan:
+Deploying my-app to Innstance — plan:
   Step 1/4: Read project docs                          (~10s)
   Step 2/4: Configure impossible.toml                  (~5s)
   Step 3/4: Deploy                                     (~1-2 min)
@@ -372,7 +372,7 @@ Then announce each step AS you start it: "Step 3/4 — deploying (1-2 min)…"
 
 Even for a 2-step task ("install ifhost then login"), say so:
 ```
-Setting up ifhost — plan:
+Setting up Innstance — plan:
   Step 1/2: Install CLI                            (~15s)
   Step 2/2: Sign in                                (~30s, browser opens)
 Total: ~45s

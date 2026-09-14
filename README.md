@@ -1,6 +1,6 @@
-# ifhost Deployment Skill
+# Innstance Deployment Skill
 
-A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code) that teaches AI agents how to deploy apps using [Impossible Hosting](https://host.impossibuild.ai).
+A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code) that teaches AI agents how to deploy apps using [Innstance](https://host.impossibuild.ai).
 
 ## Usage
 
@@ -231,7 +231,7 @@ PATH to make `ifhost` available in future terminals.
 
 ## What the agent learns
 
-- How to install and authenticate with ifhost
+- How to install and authenticate with Innstance
 - How to configure machine specs (`ifhost init`)
 - How to deploy (`ifhost deploy`)
 - Common patterns (static sites, APIs, heavy apps, interactive setup)
@@ -245,7 +245,7 @@ PATH to make `ifhost` available in future terminals.
 ```
 User: Deploy this Node.js app
 
-Agent: I'll deploy using ifhost.
+Agent: I'll deploy using Innstance.
 
 $ ifhost init --app my-api --port 3000 --memory 512
 $ ifhost deploy --secret DATABASE_URL=@env:DATABASE_URL
