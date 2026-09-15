@@ -14,7 +14,7 @@ DOCS = ("README.md", "RUNBOOK.md", "SECURITY.md", "SKILL.md")
 BOOTSTRAP_DOCS = ("README.md", "RUNBOOK.md", "SKILL.md")
 BOOTSTRAP_BEGIN = "<!-- BEGIN VERIFIED CLI BOOTSTRAP -->"
 BOOTSTRAP_END = "<!-- END VERIFIED CLI BOOTSTRAP -->"
-RELEASE_ORIGIN = "https://host.impossibuild.ai"
+RELEASE_ORIGIN = "https://innstance.impossibuild.ai"
 TRUST_ANCHOR = (
     "ifhost ssh-ed25519 "
     "AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ"
@@ -193,7 +193,7 @@ def verify_docs(root: Path = ROOT) -> None:
                 fail(f"{name}:{number}: secrets set uses KEY=@file:PATH, not --from-file")
             if re.search(r"https://<[A-Za-z0-9_-]+>\.host\.impossi\.build|https://[A-Za-z0-9_-]+\.host\.impossi\.build", line) and not re.search(r"alias|legacy|pre-move|formerly", line, re.I):
                 fail(f"{name}:{number}: published guidance hands out the current tenant domain "
-                     "(host.impossibuild.ai); host.impossi.build is an alias that serves old "
+                     "(innstance.impossibuild.ai); host.impossibuild.ai and host.impossi.build are aliases that serves old "
                      "URLs, never a name we publish - mark the line as legacy if it must appear")
             if re.search(r"\bcurl\b.*https://", line) and "--max-time" not in line and not line.endswith("\\"):
                 fail(f"{name}:{number}: one-line HTTP examples need a hard deadline")

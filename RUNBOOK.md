@@ -31,7 +31,7 @@ On macOS or Linux:
 
 ```bash
 set -eu
-release_origin=https://host.impossibuild.ai
+release_origin=https://innstance.impossibuild.ai
 allowed_signer='ifhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ'
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
@@ -111,7 +111,7 @@ On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ReleaseOrigin = 'https://host.impossibuild.ai'
+$ReleaseOrigin = 'https://innstance.impossibuild.ai'
 $AllowedSigner = 'ifhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ'
 $RawArch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 $Arch = switch ($RawArch) {
