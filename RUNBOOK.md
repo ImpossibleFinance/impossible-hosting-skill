@@ -1,7 +1,7 @@
 # Innstance Runner Deployment Runbook
 
 This runbook is the ordered procedure for deploying an application with
-ifhost runner mode. `SKILL.md` remains the full reference; this file is the
+Innstance runner mode. `SKILL.md` remains the full reference; this file is the
 short operational path and recovery guide.
 
 ## Definition of done
@@ -14,12 +14,12 @@ A deployment is complete only when:
 4. Any user-requested representative routes also return their expected
    status and content type.
 
-`ifhost deploy` provisioning a VM is not evidence that the app is live.
+`innstance deploy` provisioning a VM is not evidence that the app is live.
 
 ## Guardrails
 
 <!-- BEGIN VERIFIED CLI BOOTSTRAP -->
-When `ifhost` is missing, do not execute either installer served by the release
+When `innstance` is missing, do not execute either installer served by the release
 origin. A compromise of that origin could replace the installer and the public
 key embedded in it.
 Instead, authenticate the signed release record with the public key committed
@@ -37,10 +37,10 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 case "$(uname -s):$(uname -m)" in
-  Darwin:x86_64) archive=ifhost_darwin_amd64.tar.gz ;;
-  Darwin:arm64|Darwin:aarch64) archive=ifhost_darwin_arm64.tar.gz ;;
-  Linux:x86_64|Linux:amd64) archive=ifhost_linux_amd64.tar.gz ;;
-  Linux:arm64|Linux:aarch64) archive=ifhost_linux_arm64.tar.gz ;;
+  Darwin:x86_64) archive=innstance_darwin_amd64.tar.gz ;;
+  Darwin:arm64|Darwin:aarch64) archive=innstance_darwin_arm64.tar.gz ;;
+  Linux:x86_64|Linux:amd64) archive=innstance_linux_amd64.tar.gz ;;
+  Linux:arm64|Linux:aarch64) archive=innstance_linux_arm64.tar.gz ;;
   *) echo "Unsupported platform: $(uname -s)/$(uname -m)" >&2; exit 1 ;;
 esac
 for tool in curl ssh-keygen tar awk wc; do
@@ -95,16 +95,16 @@ fi
 [ "$actual" = "$expected" ] || { echo "Release digest mismatch; nothing installed" >&2; exit 1; }
 contents=$(tar -tzf "$tmp/$archive")
 printf 'Verified archive contents:\n%s\n' "$contents"
-[ "$contents" = ifhost ] || { echo "Release archive must contain only ifhost" >&2; exit 1; }
+[ "$contents" = innstance ] || { echo "Release archive must contain only innstance" >&2; exit 1; }
 tar -xzf "$tmp/$archive" -C "$tmp"
-[ -f "$tmp/ifhost" ] && [ ! -L "$tmp/ifhost" ] || {
+[ -f "$tmp/innstance" ] && [ ! -L "$tmp/innstance" ] || {
   echo "Release binary is not a regular file" >&2; exit 1;
 }
 mkdir -p "$HOME/.local/bin"
-install -m 0755 "$tmp/ifhost" "$HOME/.local/bin/ifhost"
+install -m 0755 "$tmp/innstance" "$HOME/.local/bin/innstance"
 export PATH="$HOME/.local/bin:$PATH"
-ifhost version
-ifhost skill sync
+innstance version
+innstance skill sync
 ```
 
 On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
@@ -119,7 +119,7 @@ $Arch = switch ($RawArch) {
   'ARM64' { 'arm64' }
   default { throw "Unsupported architecture: $RawArch" }
 }
-$Archive = "ifhost_windows_$Arch.zip"
+$Archive = "innstance_windows_$Arch.zip"
 $TempDir = Join-Path ([IO.Path]::GetTempPath()) "ifhost-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 
@@ -186,8 +186,8 @@ try {
   try {
     $Files = @($Zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
     $Files | ForEach-Object { Write-Host "Verified archive content: $($_.FullName)" }
-    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'ifhost.exe') {
-      throw 'Release archive must contain only ifhost.exe'
+    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'innstance.exe') {
+      throw 'Release archive must contain only innstance.exe'
     }
     $UnixType = (($Files[0].ExternalAttributes -shr 16) -band 0xF000)
     if ($UnixType -ne 0 -and $UnixType -ne 0x8000) {
@@ -199,21 +199,21 @@ try {
 
   $Unpacked = Join-Path $TempDir 'unpacked'
   Expand-Archive -LiteralPath $ZipPath -DestinationPath $Unpacked
-  $InstallDir = Join-Path $env:LOCALAPPDATA 'ifhost'
+  $InstallDir = Join-Path $env:LOCALAPPDATA 'innstance'
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-  Move-Item -LiteralPath (Join-Path $Unpacked 'ifhost.exe') `
-    -Destination (Join-Path $InstallDir 'ifhost.exe') -Force
+  Move-Item -LiteralPath (Join-Path $Unpacked 'innstance.exe') `
+    -Destination (Join-Path $InstallDir 'innstance.exe') -Force
   $env:Path = "$InstallDir;$env:Path"
-  ifhost version
-  ifhost skill sync
+  innstance version
+  innstance skill sync
 } finally {
   Remove-Item -LiteralPath $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 ```
 <!-- END VERIFIED CLI BOOTSTRAP -->
 
-When `ifhost` already exists, skip the bootstrap and run `ifhost version`
-followed by `ifhost skill sync`.
+When `innstance` already exists, skip the bootstrap and run `innstance version`
+followed by `innstance skill sync`.
 
 - If `skill sync` prints paths different from the files currently loaded,
   read the refreshed files before continuing. A signature or digest failure is a hard
@@ -221,7 +221,7 @@ followed by `ifhost skill sync`.
 - Use the freshly updated CLI's `--help` to confirm command syntax and
   available flags. Do not infer runner lifecycle from generic examples:
   `[build]` is ignored and the app must be started explicitly.
-- Run `ifhost status` before changing anything.
+- Run `innstance status` before changing anything.
 - Get explicit approval for the app name, machine specification, region,
   storage, environment variables, and secrets.
 - Treat an existing Dockerfile as a setup recipe. Runner deploys do not build
@@ -280,7 +280,7 @@ Resolve missing secrets with the user. Never guess them.
 For a small static or lightweight HTTP service:
 
 ```bash
-ifhost init \
+innstance init \
   --app <app-name> \
   --port 8080 \
   --memory 256 \
@@ -320,7 +320,7 @@ Present the manifest and exact deploy command to the user before proceeding.
 ## 3. Provision the runner
 
 ```bash
-ifhost deploy --region <region> --yes
+innstance deploy --region <region> --yes
 ```
 
 The resulting URL may return an error until the app is installed and started.
@@ -329,8 +329,8 @@ This is expected.
 Immediately record the machine ID:
 
 ```bash
-ifhost machines --app <app-name> --json
-ifhost describe --app <app-name> --json
+innstance machines --app <app-name> --json
+innstance describe --app <app-name> --json
 ```
 
 Pin later commands with `--machine <machine-id>` whenever the command supports
@@ -350,7 +350,7 @@ CMD ["python3", "-m", "http.server", "8080", "--directory", "/app"]
 becomes:
 
 ```bash
-ifhost machines install --app <app-name> python3
+innstance machines install --app <app-name> python3
 ```
 
 Translate image-internal paths such as `/app` to the runner's durable
@@ -373,7 +373,7 @@ Downloading inside the VM remains useful when the source is already a trusted
 public artifact:
 
 ```bash
-ifhost machines exec \
+innstance machines exec \
   --app <app-name> \
   --machine <machine-id> \
   -- sh -c "git clone --depth 1 <public-repo-url> /data/app"
@@ -400,7 +400,7 @@ archive cap; target free space is checked before upload. `push` does not accept
 `--machine`:
 
 ```bash
-ifhost machines push . --to /data/app --app <app-name> --yes-replace
+innstance machines push . --to /data/app --app <app-name> --yes-replace
 ```
 
 `push` honors `.gitignore`, `.dockerignore`, and `.impignore`, applies built-in
@@ -418,7 +418,7 @@ It uses the same verified 8 MiB resumable chunks, verifies the complete file
 beside the target, and performs a same-filesystem atomic rename:
 
 ```bash
-ifhost machines write \
+innstance machines write \
   ./server.js \
   --to /data/app/server.js \
   --app <app-name> \
@@ -468,7 +468,7 @@ files.
 The process must outlive `machines exec`:
 
 ```bash
-ifhost machines exec \
+innstance machines exec \
   --app <app-name> \
   --machine <machine-id> \
   -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
@@ -525,14 +525,14 @@ internal log messages.
 | Symptom | Likely meaning | Action |
 |---|---|---|
 | `404 page not found` before creation | The app name is probably unassigned, but this is not an availability guarantee | Confirm by creating the app; handle `name already taken` explicitly |
-| `name already taken` | One name covers pages, apps and agents, so the holder may be any of the three, on any account including this one | Run `ifhost status` (apps and pages) and `ifhost agents list` first: if this account holds it, remove that or pick another name. Otherwise ask the user for a different name |
+| `name already taken` | One name covers pages, apps and agents, so the holder may be any of the three, on any account including this one | Run `innstance status` (apps and pages) and `innstance agents list` first: if this account holds it, remove that or pick another name. Otherwise ask the user for a different name |
 | Deploy succeeds but URL fails | The runner exists but no app is listening | Install, transfer, start, and verify the process |
 | Persistent `502` | No listener, wrong port, loopback-only bind, or crashed process | Check the configured port, bind address, process, and recent logs |
 | Upload reports a rate-limit wait | The CLI exhausted the current request window | Let its bounded wait/resume finish; do not start a second manual retry loop |
 | `gzip: stdin: not in gzip format` | Uploaded archive may be incomplete or corrupt | Compare local and remote byte counts before retrying |
 | Deterministic upload `400`/`409` | Identity, checksum, or cursor state is inconsistent | Do not retry-loop; report the exact error. The destination was not replaced |
 | Transient upload fails after bounded retries | Network, SFTP, or remote commit stayed unavailable | Rerun the same command; acknowledged chunks are not retransmitted |
-| Session expired | Authentication is stale | Run `ifhost login`, then re-run `ifhost status` |
+| Session expired | Authentication is stale | Run `innstance login`, then re-run `innstance status` |
 
 ### Current uploader recovery contract
 

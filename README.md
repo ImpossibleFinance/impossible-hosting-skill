@@ -15,13 +15,13 @@ Add to your Claude Code project's `.claude/settings.json`:
 Or reference directly in a prompt:
 
 ```
-Use the ifhost skill to deploy this project.
+Use the innstance skill to deploy this project.
 ```
 
 ## Install the CLI from the signed release channel
 
 <!-- BEGIN VERIFIED CLI BOOTSTRAP -->
-When `ifhost` is missing, do not execute either installer served by the release
+When `innstance` is missing, do not execute either installer served by the release
 origin. A compromise of that origin could replace the installer and the public
 key embedded in it.
 Instead, authenticate the signed release record with the public key committed
@@ -39,10 +39,10 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 case "$(uname -s):$(uname -m)" in
-  Darwin:x86_64) archive=ifhost_darwin_amd64.tar.gz ;;
-  Darwin:arm64|Darwin:aarch64) archive=ifhost_darwin_arm64.tar.gz ;;
-  Linux:x86_64|Linux:amd64) archive=ifhost_linux_amd64.tar.gz ;;
-  Linux:arm64|Linux:aarch64) archive=ifhost_linux_arm64.tar.gz ;;
+  Darwin:x86_64) archive=innstance_darwin_amd64.tar.gz ;;
+  Darwin:arm64|Darwin:aarch64) archive=innstance_darwin_arm64.tar.gz ;;
+  Linux:x86_64|Linux:amd64) archive=innstance_linux_amd64.tar.gz ;;
+  Linux:arm64|Linux:aarch64) archive=innstance_linux_arm64.tar.gz ;;
   *) echo "Unsupported platform: $(uname -s)/$(uname -m)" >&2; exit 1 ;;
 esac
 for tool in curl ssh-keygen tar awk wc; do
@@ -97,16 +97,16 @@ fi
 [ "$actual" = "$expected" ] || { echo "Release digest mismatch; nothing installed" >&2; exit 1; }
 contents=$(tar -tzf "$tmp/$archive")
 printf 'Verified archive contents:\n%s\n' "$contents"
-[ "$contents" = ifhost ] || { echo "Release archive must contain only ifhost" >&2; exit 1; }
+[ "$contents" = innstance ] || { echo "Release archive must contain only innstance" >&2; exit 1; }
 tar -xzf "$tmp/$archive" -C "$tmp"
-[ -f "$tmp/ifhost" ] && [ ! -L "$tmp/ifhost" ] || {
+[ -f "$tmp/innstance" ] && [ ! -L "$tmp/innstance" ] || {
   echo "Release binary is not a regular file" >&2; exit 1;
 }
 mkdir -p "$HOME/.local/bin"
-install -m 0755 "$tmp/ifhost" "$HOME/.local/bin/ifhost"
+install -m 0755 "$tmp/innstance" "$HOME/.local/bin/innstance"
 export PATH="$HOME/.local/bin:$PATH"
-ifhost version
-ifhost skill sync
+innstance version
+innstance skill sync
 ```
 
 On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
@@ -121,7 +121,7 @@ $Arch = switch ($RawArch) {
   'ARM64' { 'arm64' }
   default { throw "Unsupported architecture: $RawArch" }
 }
-$Archive = "ifhost_windows_$Arch.zip"
+$Archive = "innstance_windows_$Arch.zip"
 $TempDir = Join-Path ([IO.Path]::GetTempPath()) "ifhost-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 
@@ -188,8 +188,8 @@ try {
   try {
     $Files = @($Zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
     $Files | ForEach-Object { Write-Host "Verified archive content: $($_.FullName)" }
-    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'ifhost.exe') {
-      throw 'Release archive must contain only ifhost.exe'
+    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'innstance.exe') {
+      throw 'Release archive must contain only innstance.exe'
     }
     $UnixType = (($Files[0].ExternalAttributes -shr 16) -band 0xF000)
     if ($UnixType -ne 0 -and $UnixType -ne 0x8000) {
@@ -201,21 +201,21 @@ try {
 
   $Unpacked = Join-Path $TempDir 'unpacked'
   Expand-Archive -LiteralPath $ZipPath -DestinationPath $Unpacked
-  $InstallDir = Join-Path $env:LOCALAPPDATA 'ifhost'
+  $InstallDir = Join-Path $env:LOCALAPPDATA 'innstance'
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-  Move-Item -LiteralPath (Join-Path $Unpacked 'ifhost.exe') `
-    -Destination (Join-Path $InstallDir 'ifhost.exe') -Force
+  Move-Item -LiteralPath (Join-Path $Unpacked 'innstance.exe') `
+    -Destination (Join-Path $InstallDir 'innstance.exe') -Force
   $env:Path = "$InstallDir;$env:Path"
-  ifhost version
-  ifhost skill sync
+  innstance version
+  innstance skill sync
 } finally {
   Remove-Item -LiteralPath $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 ```
 <!-- END VERIFIED CLI BOOTSTRAP -->
 
-When `ifhost` already exists, skip the bootstrap and run `ifhost version`
-followed by `ifhost skill sync`.
+When `innstance` already exists, skip the bootstrap and run `innstance version`
+followed by `innstance skill sync`.
 
 The CLI checks hourly, verifies independently signed release metadata and the
 artifact digest, updates atomically, and re-runs the requested command. Set
@@ -226,14 +226,14 @@ archive, a checksum downloaded without its signed release record, or a
 different public key.
 
 The bootstrap adds the install directory to the current process PATH. Add
-`~/.local/bin` (macOS/Linux) or `%LOCALAPPDATA%\ifhost` (Windows) to the user
-PATH to make `ifhost` available in future terminals.
+`~/.local/bin` (macOS/Linux) or `%LOCALAPPDATA%\innstance` (Windows) to the user
+PATH to make `innstance` available in future terminals.
 
 ## What the agent learns
 
 - How to install and authenticate with Innstance
-- How to configure machine specs (`ifhost init`)
-- How to deploy (`ifhost deploy`)
+- How to configure machine specs (`innstance init`)
+- How to deploy (`innstance deploy`)
 - Common patterns (static sites, APIs, heavy apps, interactive setup)
 - Non-blocking log monitoring via tmux console
 - Traps to avoid (port mismatch, OOM, autostop, env vars)
@@ -247,10 +247,10 @@ User: Deploy this Node.js app
 
 Agent: I'll deploy using Innstance.
 
-$ ifhost init --app my-api --port 3000 --memory 512
-$ ifhost deploy --secret DATABASE_URL=@env:DATABASE_URL
-$ ifhost machines push . --to /data/app --app my-api --yes-replace
-$ ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup <start-command> </dev/null > /tmp/app.log 2>&1 &"
+$ innstance init --app my-api --port 3000 --memory 512
+$ innstance deploy --secret DATABASE_URL=@env:DATABASE_URL
+$ innstance machines push . --to /data/app --app my-api --yes-replace
+$ innstance machines exec --app my-api -- sh -c "cd /data/app && setsid nohup <start-command> </dev/null > /tmp/app.log 2>&1 &"
 $ # Set IFHOST_PUBLIC_URL to the exact URL returned by deploy.
 $ curl --fail --silent --show-error --max-time 30 "${IFHOST_PUBLIC_URL}/"
 
@@ -259,7 +259,7 @@ Agent: The app returned HTTP 200 at its assigned public URL.
 
 ## Links
 
-- [ifhost CLI source](https://github.com/ImpossibleFinance/impossible-hosting)
+- [CLI source](https://github.com/ImpossibleFinance/impossible-hosting)
 - [Repository release trust anchor](./release-signers)
 - [Runner deployment runbook](./RUNBOOK.md)
 - [Docs](https://host.impossibuild.ai/docs)
