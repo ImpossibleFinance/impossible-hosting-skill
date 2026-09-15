@@ -223,9 +223,9 @@ Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 
 ### Public URLs
 
-Use the exact public URL returned by `innstance deploy`, `innstance publish`, or the resource listing. New apps, static sites, and agent panels receive an assigned `*.fly.dev` URL. The project name does not determine that hostname. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
+Use the exact public URL returned by `innstance deploy`, `innstance publish`, `innstance sites lock`, or the resource listing. New apps, static sites, and agent panels get an address built from their name, `https://<name>.fly.dev`, and the name check states it before anything is uploaded (`GET /sites/check-name?name=` returns `url`). Names are global across every account: a name the public namespace refuses is reported as taken (`NAME_TAKEN`) and the claim is released, so pick another. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
 
-In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Never guess it from the app name. Agent compute stays on AWS behind its assigned public gateway.
+In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Read it from the command's output rather than composing it, so an older resource on a shared-host URL is not mistaken for a new one. Agent compute stays on AWS behind its public gateway.
 
 ### 0b. Deploy ≠ live — never declare success without a 200
 
@@ -883,7 +883,7 @@ innstance machines domains rm myapp.com --app my-app       # Remove custom domai
 `domains add` claims the hostname only after the user proves they control
 its DNS. It prints the two records to add — a CNAME from the hostname to
 the platform (an ALIAS at a bare domain) and one TXT proof record
-(`_hostimpossibuild-verify.<hostname>`), values from the command output —
+(`_innstance-verify.<hostname>`), values from the command output —
 and exits with a pending-verification result. Add the records, then run
 the same command again to finish claiming the hostname. Pass `--wait` to
 wait up to two minutes for the proof to appear. There are no address records to add. Tell the user to
@@ -915,6 +915,7 @@ seconds at the tenant URL the command prints.
 innstance publish --name my-page page.html         # one HTML file, served as the page
 innstance publish --name menu cover.pdf body.pdf   # PDFs combined into ONE document
 innstance publish --name gallery hero.png pic.jpg  # images stacked into one scrolling page
+innstance sites lock my-page                       # claim the name now, files later
 innstance sites list                               # name, URL, mode, size, updated
 innstance sites rm my-page                         # delete a site
 ```
@@ -925,9 +926,18 @@ site's entire content — that is also how to rearrange. A single PDF or
 image is served directly at `/`.
 
 Rules that change what an agent should do:
-- Site names are GLOBAL across every account. First claim wins, and
-  `sites rm` frees the name for ANYONE to take. Deletion is immediate and
-  irreversible — say so to the user before confirming.
+- Site names are GLOBAL across every account. First claim wins. `sites rm`
+  removes the files at once; the name is kept for the owner to reclaim for
+  a while (the reply says how long), then anyone may take it. Deletion is
+  immediate and irreversible — say so to the user before confirming.
+- The address IS the name: `https://<name>.fly.dev`. When the user needs
+  the address before the files exist (to configure something against it),
+  `innstance sites lock <name>` claims it and prints the address; a later
+  `publish --name <name>` only uploads. An account may hold only a few
+  unpublished names at once and an unpublished one may be released after
+  a while; the lock reply and `sites list` state both numbers, so quote
+  those rather than a figure from memory. At the cap the command refuses
+  with `SETUP_LIMIT`: publish to a held name or `sites rm` one first.
 - `sites rm` asks interactively. Agents and scripts must pass `--yes`, or
   the command refuses and prints the flag instead of hanging on a prompt.
 - `publish` is one HTML file or PDFs/images, never both. A multi-file
