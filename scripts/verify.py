@@ -35,8 +35,8 @@ def verify_metadata(root: Path = ROOT) -> None:
         fail("manifest version must be YYYYMMDD-N")
 
     skill = (root / "SKILL.md").read_text(encoding="utf-8")
-    if not skill.startswith("---\n") or "\nname: ifhost\n" not in skill[:500]:
-        fail("SKILL.md must carry ifhost front matter")
+    if not skill.startswith("---\n") or "\nname: innstance\n" not in skill[:500]:
+        fail("SKILL.md must carry innstance front matter")
 
     anchor_path = root / "release-signers"
     if not anchor_path.is_file() or anchor_path.is_symlink():
@@ -74,7 +74,7 @@ def verify_docs(root: Path = ROOT) -> None:
         r"[\"']?\$(?:installer|download(?:ed)?)\b)"
     )
     release_resource = re.compile(
-        r"https://[^\s`'\"()]+/(?:release\.txt(?:\.sshsig)?|ifhost_[^\s`'\"()]+)",
+        r"https://[^\s`'\"()]+/(?:release\.txt(?:\.sshsig)?|(?:innstance|ifhost)_[^\s`'\"()]+)",
         re.I,
     )
     required_bootstrap = (
@@ -102,8 +102,8 @@ def verify_docs(root: Path = ROOT) -> None:
             '[ "$actual" = "$expected" ] ||',
             'contents=$(tar -tzf "$tmp/$archive")',
             'tar -xzf "$tmp/$archive"',
-            'install -m 0755 "$tmp/ifhost"',
-            "ifhost version",
+            'install -m 0755 "$tmp/innstance"',
+            "innstance version",
         ),
         "powershell": (
             f"$ReleaseOrigin = '{RELEASE_ORIGIN}'",
@@ -119,7 +119,7 @@ def verify_docs(root: Path = ROOT) -> None:
             "[IO.Compression.ZipFile]::OpenRead($ZipPath)",
             "Expand-Archive -LiteralPath $ZipPath",
             "Move-Item -LiteralPath",
-            "ifhost version",
+            "innstance version",
         ),
     }
 

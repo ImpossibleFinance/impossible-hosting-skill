@@ -1,9 +1,9 @@
 ---
-name: ifhost
-description: Deploy applications to Innstance runner VMs. Use when Codex needs to provision an app with ifhost, translate project setup into runner commands, transfer source safely, start the process, or verify and troubleshoot the public deployment.
+name: innstance
+description: Deploy applications to Innstance runner VMs. Use when Codex needs to provision an app with innstance, translate project setup into runner commands, transfer source safely, start the process, or verify and troubleshoot the public deployment.
 ---
 
-# ifhost — Deploy to Innstance
+# innstance — Deploy to Innstance
 
 Provision an isolated runner VM and HTTPS URL, then install, transfer, start,
 and verify the application explicitly. Use [RUNBOOK.md](RUNBOOK.md) for the
@@ -13,8 +13,10 @@ ordered deployment and recovery procedure.
 
 ### 0. Refresh the CLI and these instructions first, every session
 
+The command used to be called `ifhost`. That name still works and runs the same binary, but new installs use `innstance`, and the served installer leaves `ifhost` beside it as a link.
+
 <!-- BEGIN VERIFIED CLI BOOTSTRAP -->
-When `ifhost` is missing, do not execute either installer served by the release
+When `innstance` is missing, do not execute either installer served by the release
 origin. A compromise of that origin could replace the installer and the public
 key embedded in it.
 Instead, authenticate the signed release record with the public key committed
@@ -32,10 +34,10 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 case "$(uname -s):$(uname -m)" in
-  Darwin:x86_64) archive=ifhost_darwin_amd64.tar.gz ;;
-  Darwin:arm64|Darwin:aarch64) archive=ifhost_darwin_arm64.tar.gz ;;
-  Linux:x86_64|Linux:amd64) archive=ifhost_linux_amd64.tar.gz ;;
-  Linux:arm64|Linux:aarch64) archive=ifhost_linux_arm64.tar.gz ;;
+  Darwin:x86_64) archive=innstance_darwin_amd64.tar.gz ;;
+  Darwin:arm64|Darwin:aarch64) archive=innstance_darwin_arm64.tar.gz ;;
+  Linux:x86_64|Linux:amd64) archive=innstance_linux_amd64.tar.gz ;;
+  Linux:arm64|Linux:aarch64) archive=innstance_linux_arm64.tar.gz ;;
   *) echo "Unsupported platform: $(uname -s)/$(uname -m)" >&2; exit 1 ;;
 esac
 for tool in curl ssh-keygen tar awk wc; do
@@ -90,16 +92,16 @@ fi
 [ "$actual" = "$expected" ] || { echo "Release digest mismatch; nothing installed" >&2; exit 1; }
 contents=$(tar -tzf "$tmp/$archive")
 printf 'Verified archive contents:\n%s\n' "$contents"
-[ "$contents" = ifhost ] || { echo "Release archive must contain only ifhost" >&2; exit 1; }
+[ "$contents" = innstance ] || { echo "Release archive must contain only innstance" >&2; exit 1; }
 tar -xzf "$tmp/$archive" -C "$tmp"
-[ -f "$tmp/ifhost" ] && [ ! -L "$tmp/ifhost" ] || {
+[ -f "$tmp/innstance" ] && [ ! -L "$tmp/innstance" ] || {
   echo "Release binary is not a regular file" >&2; exit 1;
 }
 mkdir -p "$HOME/.local/bin"
-install -m 0755 "$tmp/ifhost" "$HOME/.local/bin/ifhost"
+install -m 0755 "$tmp/innstance" "$HOME/.local/bin/innstance"
 export PATH="$HOME/.local/bin:$PATH"
-ifhost version
-ifhost skill sync
+innstance version
+innstance skill sync
 ```
 
 On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
@@ -114,7 +116,7 @@ $Arch = switch ($RawArch) {
   'ARM64' { 'arm64' }
   default { throw "Unsupported architecture: $RawArch" }
 }
-$Archive = "ifhost_windows_$Arch.zip"
+$Archive = "innstance_windows_$Arch.zip"
 $TempDir = Join-Path ([IO.Path]::GetTempPath()) "ifhost-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 
@@ -181,8 +183,8 @@ try {
   try {
     $Files = @($Zip.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
     $Files | ForEach-Object { Write-Host "Verified archive content: $($_.FullName)" }
-    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'ifhost.exe') {
-      throw 'Release archive must contain only ifhost.exe'
+    if ($Files.Count -ne 1 -or $Files[0].FullName -cne 'innstance.exe') {
+      throw 'Release archive must contain only innstance.exe'
     }
     $UnixType = (($Files[0].ExternalAttributes -shr 16) -band 0xF000)
     if ($UnixType -ne 0 -and $UnixType -ne 0x8000) {
@@ -194,21 +196,21 @@ try {
 
   $Unpacked = Join-Path $TempDir 'unpacked'
   Expand-Archive -LiteralPath $ZipPath -DestinationPath $Unpacked
-  $InstallDir = Join-Path $env:LOCALAPPDATA 'ifhost'
+  $InstallDir = Join-Path $env:LOCALAPPDATA 'innstance'
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-  Move-Item -LiteralPath (Join-Path $Unpacked 'ifhost.exe') `
-    -Destination (Join-Path $InstallDir 'ifhost.exe') -Force
+  Move-Item -LiteralPath (Join-Path $Unpacked 'innstance.exe') `
+    -Destination (Join-Path $InstallDir 'innstance.exe') -Force
   $env:Path = "$InstallDir;$env:Path"
-  ifhost version
-  ifhost skill sync
+  innstance version
+  innstance skill sync
 } finally {
   Remove-Item -LiteralPath $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 ```
 <!-- END VERIFIED CLI BOOTSTRAP -->
 
-When `ifhost` already exists, skip the bootstrap and run `ifhost version`
-followed by `ifhost skill sync`.
+When `innstance` already exists, skip the bootstrap and run `innstance version`
+followed by `innstance skill sync`.
 
 `skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
 paths. If this file was loaded from another path, read those refreshed files
@@ -217,22 +219,22 @@ from the copy you already have and mention the failed refresh to the user — a
 slightly stale bundle is safe; guessed instructions are not.
 
 Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
-`ifhost update` remains available for an explicit update.
+`innstance update` remains available for an explicit update.
 
 ### Public URLs
 
-Use the exact public URL returned by `ifhost deploy`, `ifhost publish`, or the resource listing. New apps, static sites, and agent panels receive an assigned `*.fly.dev` URL. The project name does not determine that hostname. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://host.impossibuild.ai`.
+Use the exact public URL returned by `innstance deploy`, `innstance publish`, or the resource listing. New apps, static sites, and agent panels receive an assigned `*.fly.dev` URL. The project name does not determine that hostname. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://host.impossibuild.ai`.
 
 In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Never guess it from the app name. Agent compute stays on AWS behind its assigned public gateway.
 
 ### 0b. Deploy ≠ live — never declare success without a 200
 
-`ifhost deploy` succeeding means the VM is provisioned, NOTHING more. The
+`innstance deploy` succeeding means the VM is provisioned, NOTHING more. The
 VM boots as a bare shell with no app process; the CLI prints "Runner VM
 ready — your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
-   `ifhost machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
+   `innstance machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
 2. `curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"`
    printed `200` (or the app's health endpoint did)
 
@@ -244,7 +246,7 @@ If you cannot get a 200, report exactly what state things are in.
 (dockerfile or cmd) is IGNORED — the platform never builds images and never
 runs a configured start command. Deploys boot the bare runner VM; you drive
 setup and startup yourself as above. The CLI warns when it sees `[build]`.
-Never CREATE a Dockerfile for an ifhost deploy — it will not be built. But
+Never CREATE a Dockerfile for an innstance deploy — it will not be built. But
 if the repo already has one (local dev, other platforms), leave it alone;
 it simply isn't used here — and DO read it: it's the project's own setup
 recipe. See "Deriving runner steps from an existing Dockerfile" below.
@@ -262,7 +264,7 @@ stop and report it as unsupported by the current runner workflow.
 ### 0c. Cookie-based authentication on an Innstance URL
 
 When an application uses a browser cookie for sign-in or authorization on its
-ifhost-provided URL, configure the application or framework itself so that:
+Innstance-provided URL, configure the application or framework itself so that:
 
 - the exact session-cookie name begins with `__Host-`;
 - the cookie uses `Secure`, `HttpOnly`, and an explicit `Path=/`;
@@ -281,7 +283,7 @@ provider to issue it.
 
 ### 1. Understand the project BEFORE deploying
 
-**CRITICAL:** Before running `ifhost init` or `ifhost deploy`, complete this checklist:
+**CRITICAL:** Before running `innstance init` or `innstance deploy`, complete this checklist:
 
 **Step A — Read the docs:**
 - README.md, INSTALL.md, docs/install/ folder, or any setup guide
@@ -344,7 +346,7 @@ project; they haven't. Accepting defaults should be a one-word reply ("go", "ok"
 Show the impossible.toml you'll generate and the exact deploy command with all flags.
 Let the user confirm or correct before proceeding.
 
-Only after the user approves should you run `ifhost init` and `ifhost deploy`.
+Only after the user approves should you run `innstance init` and `innstance deploy`.
 If the user says not to modify the source repository, run both commands from
 a temporary workspace: `init` creates `impossible.toml`, and `deploy` may
 update it with the resolved app name or port.
@@ -356,7 +358,7 @@ no matter how short the task seems. Users looking at a blank chat don't know if 
 thinking, working, or stuck. The step list is the contract — you'll do these N things,
 it'll take ~X minutes.
 
-Before running ANY ifhost command that takes more than a few seconds, print:
+Before running ANY innstance command that takes more than a few seconds, print:
 
 ```
 Deploying my-app to Innstance — plan:
@@ -370,7 +372,7 @@ Total ETA: ~2-3 minutes
 
 Then announce each step AS you start it: "Step 3/4 — deploying (1-2 min)…"
 
-Even for a 2-step task ("install ifhost then login"), say so:
+Even for a 2-step task ("install innstance then login"), say so:
 ```
 Setting up Innstance — plan:
   Step 1/2: Install CLI                            (~15s)
@@ -394,7 +396,7 @@ Update the user at each step. Never go silent for more than 30 seconds during a 
 
 ### 2b. First-start of an app can take 5-15 minutes — plan for it
 
-A fresh deploy is NOT "ready to serve" the moment `ifhost deploy` returns. Expect, on top of the control-plane deploy (10-60s):
+A fresh deploy is NOT "ready to serve" the moment `innstance deploy` returns. Expect, on top of the control-plane deploy (10-60s):
 
 - **Image pull to the VM** (30s-2min, depending on image size + region network)
 - **Volume init / encrypt / format** (5-15s, one-time per volume)
@@ -407,14 +409,14 @@ A fresh deploy is NOT "ready to serve" the moment `ifhost deploy` returns. Expec
 Implications for you as the agent driving the deploy:
 
 - A single "HTTP probe failed after 60s" is **not sufficient evidence** to conclude the deploy is broken. Only conclude broken if the logs show crash signatures (`Exec format error`, `max restart count`, `Main child exited with code: 1`, OOM kill, port-mismatch refused-connection that persists >3 min after the app should have started).
-- When the probe comes back "no response yet" for a known-slow stack (anything with "plugin" or "agent" or "gateway" in its name), print a friendly **"still initializing, this can take up to 15 min for <stack>; watch with `ifhost machines logs --app X --follow`"** — not a failure.
-- The `ifhost deploy` command distinguishes "still starting" (exit 0, warn) from "broken" (exit 1, error). Trust its exit code; don't treat every warning as a deploy failure.
+- When the probe comes back "no response yet" for a known-slow stack (anything with "plugin" or "agent" or "gateway" in its name), print a friendly **"still initializing, this can take up to 15 min for <stack>; watch with `innstance machines logs --app X --follow`"** — not a failure.
+- The `innstance deploy` command distinguishes "still starting" (exit 0, warn) from "broken" (exit 1, error). Trust its exit code; don't treat every warning as a deploy failure.
 - Ask the user to wait 10-15 min before concluding "the bot doesn't work" on the first message. Subsequent messages are fast.
 - Retry loops inside the app (e.g. openclaw's setWebhook call to Telegram) can compound the wait. A single outbound flake from the host region can reset app init by 30s. That's an app-level issue, not ours — document it, don't treat it as our deploy being broken.
 
 ### 2a. STOP polling once /healthz returns 200
 
-**Common time-waster:** agents repeatedly poll `ifhost machines logs` and `Monitor`
+**Common time-waster:** agents repeatedly poll `innstance machines logs` and `Monitor`
 waiting for specific app-internal log strings ("gateway ready", "channel connected",
 "polling started"). This wastes 5-20 minutes per deploy.
 
@@ -439,11 +441,11 @@ Never round an unverified deploy up to "it's deployed".
 
 ### 3. Read --help for command syntax
 
-Before running any ifhost command, check its help text:
+Before running any innstance command, check its help text:
 
 ```bash
-ifhost deploy --help
-ifhost machines logs --help
+innstance deploy --help
+innstance machines logs --help
 ```
 
 Use the freshly updated CLI help to confirm command syntax and available
@@ -452,21 +454,21 @@ flags. Do not infer runner lifecycle from generic examples in help output:
 
 ## Install / Update
 
-When `ifhost` is missing, use the signed-channel bootstrap in Rule 0 exactly as
+When `innstance` is missing, use the signed-channel bootstrap in Rule 0 exactly as
 written. Do not substitute either release-origin installer, another public
 key, an unsigned archive, or a checksum that is not authenticated by the
 SSHSIG release record.
 
-For an existing installation, invoking `ifhost` performs its independently
+For an existing installation, invoking `innstance` performs its independently
 signed automatic update check. Run this at the start of every session:
 
 ```bash
-ifhost version
-ifhost skill sync
+innstance version
+innstance skill sync
 ```
 
 On macOS/Linux, add `~/.local/bin` to PATH if needed. On Windows, the Rule 0
-PowerShell block adds `%LOCALAPPDATA%\ifhost` to the current process PATH; add
+PowerShell block adds `%LOCALAPPDATA%\innstance` to the current process PATH; add
 that directory to the user PATH for future terminals. If OpenSSH Client is
 missing, run `Add-WindowsCapability -Online -Name
 OpenSSH.Client~~~~0.0.1.0` in an elevated PowerShell, then repeat the verified
@@ -475,7 +477,7 @@ bootstrap.
 Verify installation:
 
 ```bash
-ifhost --help
+innstance --help
 ```
 
 If any signature or digest check fails, stop without installing. Do not bypass
@@ -484,9 +486,9 @@ the Rule 0 trust anchor or use a direct archive pipe.
 ## Quick Start
 
 ```bash
-ifhost login                                          # Browser device authorization (one-time)
-ifhost init --app my-app --port 3000 --memory 512 --storage local
-ifhost deploy                                         # Provision the runner
+innstance login                                          # Browser device authorization (one-time)
+innstance init --app my-app --port 3000 --memory 512 --storage local
+innstance deploy                                         # Provision the runner
 # Then install, transfer to /data/app, start, and verify an HTTP 200.
 ```
 
@@ -504,8 +506,8 @@ may need to be recreated after a restart, and the application process must
 always be started again.
 
 ```bash
-ifhost deploy --secret KEY=@env:KEY --yes
-ifhost machines console start --app <app> -- bash
+innstance deploy --secret KEY=@env:KEY --yes
+innstance machines console start --app <app> -- bash
 # download, authenticate against an upstream-published key or pinned digest,
 # and inspect upstream installers before executing; never run unauthenticated code
 ```
@@ -536,10 +538,10 @@ Worked example — a static site whose Dockerfile is
 `FROM python:3.12-slim` + `COPY . .` + `CMD python3 -m http.server 8080 --directory /app`:
 
 ```bash
-ifhost machines install --app my-site python3
+innstance machines install --app my-site python3
 printf '%s\n' 'state/data.db' > .ifhost-state-paths  # only when the app owns this runtime path
-ifhost machines push ./ --to /data/app --app my-site --yes-replace
-ifhost machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
+innstance machines push ./ --to /data/app --app my-site --yes-replace
+innstance machines exec --app my-site -- sh -c "setsid nohup python3 -m http.server 8080 --bind 0.0.0.0 --directory /data/app > /tmp/app.log 2>&1 < /dev/null &"
 curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"   # must print 200
 ```
 
@@ -547,7 +549,7 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"   
 
 - **Front-load system deps before running the project's install script.** The runner base image is minimal — only `tmux` and `ca-certificates` are preinstalled; no `curl`, `xz-utils`, `procps`, or `git` out of the box. Use the detached, verified installer:
   ```
-  ifhost machines install --app X curl xz-utils procps git
+  innstance machines install --app X curl xz-utils procps git
   ```
   Discovering each missing tool one failure at a time wastes 30s+ per round trip.
 - **Set `HOME` explicitly before running install scripts.** Many installers use `$HOME/.local/bin` etc; if `HOME` is unset the script installs to `//.local/bin` (double-slash) or bails. `export HOME=/root` before running an authenticated and inspected installer.
@@ -560,12 +562,12 @@ curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"   
 
 ## Command Reference
 
-### ifhost login
+### innstance login
 
 Authenticate through browser device authorization. The CLI prints a short
 sign-in code, opens the approval page, and polls until you approve it. The
 approval page can be opened on any browser-capable device; it does not need a
-browser or loopback listener on the machine running `ifhost`. Sign in through
+browser or loopback listener on the machine running `innstance`. Sign in through
 the providers configured in the dashboard, verify the displayed machine, and
 approve it. Credentials are stored at `~/.impossible/credentials.json`
 (`%USERPROFILE%\.impossible\credentials.json` on Windows). If
@@ -581,11 +583,11 @@ If `IMPOSSIBLE_API_TOKEN` is set, requests use that token instead of saved
 credentials. `--switch` still selects a saved account; unset the override only
 when you intend subsequent commands to use that account.
 
-### ifhost logout
+### innstance logout
 
 Remove stored credentials.
 
-### ifhost status
+### innstance status
 
 Overview of all projects with machine IDs. **Run this first** to understand what's deployed.
 
@@ -613,12 +615,12 @@ Use machine IDs from this output with `--machine` on exec/console commands.
 
 ---
 
-### ifhost init
+### innstance init
 
-Generate `impossible.toml` — required before `ifhost deploy`.
+Generate `impossible.toml` — required before `innstance deploy`.
 
 ```bash
-ifhost init --app <name> --port <port> --memory <mb> [flags]
+innstance init --app <name> --port <port> --memory <mb> [flags]
 ```
 
 | Flag | Default | Description |
@@ -637,12 +639,12 @@ Generates `impossible.toml` in the current directory. Edit it directly after cre
 
 ---
 
-### ifhost deploy
+### innstance deploy
 
 Deploy the app. Requires `impossible.toml`.
 
 ```bash
-ifhost deploy [flags]
+innstance deploy [flags]
 ```
 
 | Flag | Description |
@@ -650,7 +652,7 @@ ifhost deploy [flags]
 | `--env KEY=VALUE` | Set env var (repeatable). Merged with [env] in toml. |
 | `--secret KEY=@env:NAME` | Set a secret by protected reference. Also accepts `KEY=@file:PATH` or one `KEY=@stdin`; literal values are refused |
 | `--port N` | Override container port |
-| `--region <code>` | Region (e.g. iad, sin, lhr). See `ifhost regions`. |
+| `--region <code>` | Region (e.g. iad, sin, lhr). See `innstance regions`. |
 | `--storage local` | Explicitly provision a `/data` volume on first deploy. With no storage flag or declared volumes, runner deploys currently provision a 1 GB `/data` volume automatically. |
 | `--app <name>` | Override app name from toml |
 | `--yes` | Skip confirmation prompts |
@@ -699,25 +701,25 @@ Note: impossible.toml already names "my-app" but the server has no record of it.
 ```
 
 This is an advisory and the deploy proceeds. It appears on the **normal first
-deploy** after `ifhost init` (the toml names the app before it exists), and it
+deploy** after `innstance init` (the toml names the app before it exists), and it
 also appears if an app was previously destroyed. The CLI cannot tell those
 apart, so it tells you rather than guessing.
 
 Nothing to do in the common case. Only if the app genuinely existed before and
 had a custom domain, tell the user its DNS now points at a released address and
-check with `ifhost machines domains list --app <name>`.
+check with `innstance machines domains list --app <name>`.
 
 `--recreate-app` only silences this note. It does not change what happens.
 
 ---
 
-### ifhost describe --app \<name\>
+### innstance describe --app \<name\>
 
 Full app context in one call. Aggregates: app status, machines, env vars, secret key names, domains, persistent volumes, recent deploys, and recent platform logs.
 
 ```bash
-ifhost describe --app my-app         # Human-readable summary
-ifhost describe --app my-app --json  # Structured JSON (for programmatic use)
+innstance describe --app my-app         # Human-readable summary
+innstance describe --app my-app --json  # Structured JSON (for programmatic use)
 ```
 
 Output includes:
@@ -738,14 +740,14 @@ Output includes:
 
 ---
 
-### ifhost machines
+### innstance machines
 
 All app-specific commands live under `machines`. Requires `--app <name>` or an `impossible.toml` in the current directory.
 
 #### List machines
 
 ```bash
-ifhost machines --app my-app
+innstance machines --app my-app
 ```
 
 Shows machines grouped by state with IDs for targeting.
@@ -753,9 +755,9 @@ Shows machines grouped by state with IDs for targeting.
 #### Start / Stop / Restart
 
 ```bash
-ifhost machines start --app my-app
-ifhost machines stop --app my-app       # No cost while stopped
-ifhost machines restart --app my-app
+innstance machines start --app my-app
+innstance machines stop --app my-app       # No cost while stopped
+innstance machines restart --app my-app
 ```
 
 Apps run on a single machine. Multi-machine scaling is on the roadmap.
@@ -764,17 +766,17 @@ Apps run on a single machine. Multi-machine scaling is on the roadmap.
 
 ---
 
-### ifhost machines logs
+### innstance machines logs
 
 Stream or tail runtime logs from your app. **Default mode is live streaming (tail -f)** — runs indefinitely until Ctrl+C.
 
 ```bash
-ifhost machines logs --app my-app                      # Live stream (tail -f)
-ifhost machines logs --app my-app --since 1h           # Last hour, then exit
-ifhost machines logs --app my-app --lines 20           # Last 20 lines, then exit
-ifhost machines logs --app my-app --grep "ERROR"       # Only lines containing ERROR
-ifhost machines logs --app my-app --level error        # Only error/fatal/panic lines
-ifhost machines logs --app my-app --json               # Structured JSON per line
+innstance machines logs --app my-app                      # Live stream (tail -f)
+innstance machines logs --app my-app --since 1h           # Last hour, then exit
+innstance machines logs --app my-app --lines 20           # Last 20 lines, then exit
+innstance machines logs --app my-app --grep "ERROR"       # Only lines containing ERROR
+innstance machines logs --app my-app --level error        # Only error/fatal/panic lines
+innstance machines logs --app my-app --json               # Structured JSON per line
 ```
 
 | Flag | Description |
@@ -790,14 +792,14 @@ ifhost machines logs --app my-app --json               # Structured JSON per lin
 
 ---
 
-### ifhost machines exec
+### innstance machines exec
 
 Run a one-off command inside a running machine. For commands that finish without stdin.
 
 ```bash
-ifhost machines exec --app my-app -- ls /data
-ifhost machines exec --app my-app -- sh -c 'test -n "$NODE_ENV" && echo NODE_ENV=set || echo NODE_ENV=unset'
-ifhost machines exec --app my-app --machine e784160df242e8 -- cat /var/log/app.log
+innstance machines exec --app my-app -- ls /data
+innstance machines exec --app my-app -- sh -c 'test -n "$NODE_ENV" && echo NODE_ENV=set || echo NODE_ENV=unset'
+innstance machines exec --app my-app --machine e784160df242e8 -- cat /var/log/app.log
 ```
 
 Timeout: 10 minutes (enforced server-side, cannot be raised). For longer-running
@@ -807,14 +809,14 @@ interactive (prompts, wizards, REPLs).
 
 ---
 
-### ifhost machines console
+### innstance machines console
 
 Interactive tmux-backed console for commands that need stdin or take a long time.
 
 #### Start a session
 
 ```bash
-ifhost machines console start --app my-app -- bash
+innstance machines console start --app my-app -- bash
 ```
 
 Returns a `session-id` (e.g., `ifhost-01abc`).
@@ -822,15 +824,15 @@ Returns a `session-id` (e.g., `ifhost-01abc`).
 #### Send input / Read output / End session
 
 ```bash
-ifhost machines console input --app my-app <session-id> "npm install"
-ifhost machines console input --app my-app <session-id> --key Enter
-ifhost machines console output --app my-app <session-id> --lines 100
-ifhost machines console end --app my-app <session-id>
+innstance machines console input --app my-app <session-id> "npm install"
+innstance machines console input --app my-app <session-id> --key Enter
+innstance machines console output --app my-app <session-id> --lines 100
+innstance machines console end --app my-app <session-id>
 ```
 
 ---
 
-### ifhost machines env / secrets
+### innstance machines env / secrets
 
 **API parity:** Environment and secret writes/deletes also save without
 restarting. Use `?restart=true` only when an immediate restart is intended.
@@ -843,24 +845,24 @@ and repeat the public HTTP check.
 Replacing existing values non-interactively requires `--yes-replace`.
 
 ```bash
-ifhost machines env set KEY=VALUE --app my-app              # Set (no restart)
-ifhost machines env set KEY=VALUE --restart --app my-app    # Set + restart immediately
-ifhost machines env list --app my-app
-ifhost machines env rm KEY --app my-app                     # Remove env var
-ifhost machines secrets set API_KEY=@env:API_KEY --app my-app
-ifhost machines secrets set API_KEY=@file:/run/secrets/api-key --app my-app
-printf '%s' "$API_KEY" | ifhost machines secrets set API_KEY=@stdin --app my-app
-ifhost machines secrets list --app my-app                   # Shows key names only
-ifhost machines secrets rm KEY --app my-app                 # Remove secret
+innstance machines env set KEY=VALUE --app my-app              # Set (no restart)
+innstance machines env set KEY=VALUE --restart --app my-app    # Set + restart immediately
+innstance machines env list --app my-app
+innstance machines env rm KEY --app my-app                     # Remove env var
+innstance machines secrets set API_KEY=@env:API_KEY --app my-app
+innstance machines secrets set API_KEY=@file:/run/secrets/api-key --app my-app
+printf '%s' "$API_KEY" | innstance machines secrets set API_KEY=@stdin --app my-app
+innstance machines secrets list --app my-app                   # Shows key names only
+innstance machines secrets rm KEY --app my-app                 # Remove secret
 ```
 
-### ifhost machines volumes
+### innstance machines volumes
 
 ```bash
-ifhost machines volumes list --app my-app
-ifhost machines volumes create my-data --size 3 --mount /data --app my-app
-ifhost machines volumes extend my-data --to 10 --app my-app   # Grow only, cannot shrink
-ifhost machines volumes rm my-data --app my-app --yes
+innstance machines volumes list --app my-app
+innstance machines volumes create my-data --size 3 --mount /data --app my-app
+innstance machines volumes extend my-data --to 10 --app my-app   # Grow only, cannot shrink
+innstance machines volumes rm my-data --app my-app --yes
 ```
 
 **Volumes are per-machine** (one machine, one disk). Shared volumes are on
@@ -869,13 +871,13 @@ the roadmap; for shared state today use a managed database.
 Growing an attached volume makes the new space available online; a restart
 is not required. New volumes still need a deployment to attach them.
 
-### ifhost machines domains
+### innstance machines domains
 
 ```bash
-ifhost machines domains add myapp.com --app my-app
-ifhost machines domains check myapp.com --app my-app
-ifhost machines domains list --app my-app
-ifhost machines domains rm myapp.com --app my-app       # Remove custom domain
+innstance machines domains add myapp.com --app my-app
+innstance machines domains check myapp.com --app my-app
+innstance machines domains list --app my-app
+innstance machines domains rm myapp.com --app my-app       # Remove custom domain
 ```
 
 `domains add` claims the hostname only after the user proves they control
@@ -904,17 +906,17 @@ Surface its manual configuration and explain that an unpurchased domain must be
 registered first, while an owned domain may need its nameservers configured.
 TLS issuance is automatic after the required records are correct.
 
-### ifhost publish and ifhost sites
+### innstance publish and innstance sites
 
 `publish` puts files on the web with no machine and no config: live in
 seconds at the tenant URL the command prints.
 
 ```bash
-ifhost publish --name my-page page.html         # one HTML file, served as the page
-ifhost publish --name menu cover.pdf body.pdf   # PDFs combined into ONE document
-ifhost publish --name gallery hero.png pic.jpg  # images stacked into one scrolling page
-ifhost sites list                               # name, URL, mode, size, updated
-ifhost sites rm my-page                         # delete a site
+innstance publish --name my-page page.html         # one HTML file, served as the page
+innstance publish --name menu cover.pdf body.pdf   # PDFs combined into ONE document
+innstance publish --name gallery hero.png pic.jpg  # images stacked into one scrolling page
+innstance sites list                               # name, URL, mode, size, updated
+innstance sites rm my-page                         # delete a site
 ```
 
 File order is the order typed: PDF pages merge in that order, images stack
@@ -929,23 +931,23 @@ Rules that change what an agent should do:
 - `sites rm` asks interactively. Agents and scripts must pass `--yes`, or
   the command refuses and prints the flag instead of hanging on a prompt.
 - `publish` is one HTML file or PDFs/images, never both. A multi-file
-  website (HTML plus assets) is `ifhost deploy` territory.
-- Site count and size limits are plan-dependent; run `ifhost billing`
+  website (HTML plus assets) is `innstance deploy` territory.
+- Site count and size limits are plan-dependent; run `innstance billing`
   rather than quoting numbers from memory.
 
 Custom domains on a published site: see the next section.
 
-### ifhost sites domains
+### innstance sites domains
 
 Published static sites take custom domains too, with the identical flow —
 prove control, add the printed records, certificate issues on its own. The
 site is named as the first argument (sites have no `--app` context):
 
 ```bash
-ifhost sites domains add my-page myapp.com
-ifhost sites domains check my-page myapp.com
-ifhost sites domains list my-page
-ifhost sites domains rm my-page myapp.com
+innstance sites domains add my-page myapp.com
+innstance sites domains check my-page myapp.com
+innstance sites domains list my-page
+innstance sites domains rm my-page myapp.com
 ```
 
 Everything in the `machines domains` section above — the proof record, the
@@ -953,12 +955,12 @@ two-minute wait and re-run behavior, treating `domains check` output as
 authoritative, never inventing provider workflows — applies to these
 commands unchanged.
 
-### ifhost machines write / push
+### innstance machines write / push
 
 ```bash
-ifhost machines write <local-file> --to <remote-path> --app my-app                  # Write a single file
-ifhost machines write <local-file> --to <remote-path> --machine <id> --app my-app   # Target specific machine
-ifhost machines push <local-dir> --to <remote-dir> --app my-app                     # Push a directory tree
+innstance machines write <local-file> --to <remote-path> --app my-app                  # Write a single file
+innstance machines write <local-file> --to <remote-path> --machine <id> --app my-app   # Target specific machine
+innstance machines push <local-dir> --to <remote-dir> --app my-app                     # Push a directory tree
 ```
 
 `write` caps each file at 10 MiB. `push` has no arbitrary total archive cap.
@@ -984,13 +986,13 @@ exclusions such as `.git`, `node_modules`, and `.env*`, and skips symlinks and
 individual files larger than 50 MB. It checks target free space before upload.
 Never copy private Git credentials into the runner.
 
-### ifhost machines pull
+### innstance machines pull
 
 Download a directory from the running VM as a `.tar.gz` backup.
 
 ```bash
-ifhost machines pull /data/app --app my-app                             # Prompts before downloading
-ifhost machines pull /data/app --to backup.tar.gz --yes-egress --app my-app   # Non-interactive
+innstance machines pull /data/app --app my-app                             # Prompts before downloading
+innstance machines pull /data/app --to backup.tar.gz --yes-egress --app my-app   # Non-interactive
 ```
 
 The download is METERED as outbound traffic on the account, the same as
@@ -1012,13 +1014,13 @@ are staged under the VM's `/tmp`, so the VM needs about the directory's
 size in free space; if archiving fails or times out, pull a smaller
 subdirectory instead.
 
-### ifhost machines wait-for
+### innstance machines wait-for
 
 Block until a substring appears in a file inside the VM. Useful for waiting on app readiness.
 
 ```bash
-ifhost machines wait-for --file /var/log/app.log --match "listening on" --app my-app
-ifhost machines wait-for --file /data/startup.log --match "ready" --timeout 2m --app my-app
+innstance machines wait-for --file /var/log/app.log --match "listening on" --app my-app
+innstance machines wait-for --file /data/startup.log --match "ready" --timeout 2m --app my-app
 ```
 
 | Flag | Default | Description |
@@ -1027,37 +1029,37 @@ ifhost machines wait-for --file /data/startup.log --match "ready" --timeout 2m -
 | `--match` | (required) | Substring to wait for |
 | `--timeout` | 5m | Timeout (e.g. 60s, 2m) |
 
-### ifhost machines destroy
+### innstance machines destroy
 
 ```bash
-ifhost machines destroy --yes-irreversible --app my-app                # Delete entire app + resources
-ifhost machines destroy --yes-irreversible <machine-id> --app my-app   # Delete single machine
+innstance machines destroy --yes-irreversible --app my-app                # Delete entire app + resources
+innstance machines destroy --yes-irreversible <machine-id> --app my-app   # Delete single machine
 ```
 
-### ifhost apply
+### innstance apply
 
 Push stored CPU, memory, environment and secret configuration to existing machines without rebuilding. Apply preserves each machine's image, service configuration and volume mounts. When `impossible.toml` supplies resource settings, the CLI saves those settings before applying them.
 
 Inspect `applied` and `failed_machines` in JSON output. Partial failures return HTTP 207 and the CLI currently exits zero while listing the failures; exit zero alone does not establish that every machine was updated. Retry the failed rollout and verify the application process and public URL after the machine transition completes.
 
 ```bash
-ifhost apply --app my-app
+innstance apply --app my-app
 ```
 
-### ifhost tokens
+### innstance tokens
 
 ```bash
-ifhost tokens create --name "ci-bot"     # Create a new API token (default name: "cli")
-ifhost tokens list                       # List all API tokens
-ifhost tokens revoke <token-id> --yes    # Revoke a token without a prompt
+innstance tokens create --name "ci-bot"     # Create a new API token (default name: "cli")
+innstance tokens list                       # List all API tokens
+innstance tokens revoke <token-id> --yes    # Revoke a token without a prompt
 ```
 
 Use tokens for CI pipelines or agent auth without putting the credential in an
 argument:
 
 ```bash
-printf '%s' "$IFHOST_TOKEN" | ifhost login --token -
-ifhost login --from-file /run/secrets/ifhost-token
+printf '%s' "$IFHOST_TOKEN" | innstance login --token -
+innstance login --from-file /run/secrets/ifhost-token
 ```
 
 For application secrets, pass a source reference to `deploy --secret` or
@@ -1065,23 +1067,23 @@ For application secrets, pass a source reference to `deploy --secret` or
 per command) `KEY=@stdin`. Literal secret values are refused. Only the resolved
 value is sent to the platform; local files stay local.
 
-### ifhost auth
+### innstance auth
 
 ```bash
-ifhost auth bind-wallet <address>        # Bind an EVM wallet for USDC top-ups (polls for verification)
-ifhost auth wallets                      # List bound wallets (pending + verified)
-ifhost auth unbind-wallet <address>      # Remove a wallet binding
+innstance auth bind-wallet <address>        # Bind an EVM wallet for USDC top-ups (polls for verification)
+innstance auth wallets                      # List bound wallets (pending + verified)
+innstance auth unbind-wallet <address>      # Remove a wallet binding
 ```
 
-### ifhost regions
+### innstance regions
 
 List available deployment regions.
 
-### ifhost version / update
+### innstance version / update
 
 ```bash
-ifhost version                           # Show CLI version and check for updates
-ifhost update                            # Update CLI to the latest version
+innstance version                           # Show CLI version and check for updates
+innstance update                            # Update CLI to the latest version
 ```
 
 Automatic-check failures are recorded in
@@ -1091,35 +1093,35 @@ the requested command continues. Set
 treat a quiet background check as proof that an update was available or
 installed.
 
-### ifhost billing (alias: sub)
+### innstance billing (alias: sub)
 
 ```bash
-ifhost billing status                     # Current subscription status
-ifhost billing subscribe hobby            # Subscribe to a plan (hobby, pro, team)
-ifhost billing subscribe --plan pro --pay crypto   # Specify payment method
-ifhost billing cancel                     # Cancel subscription
-ifhost billing cancel-change              # Call off a queued plan change, keep the current plan
-ifhost billing invoices                   # Payments: what the card was charged, and when
-ifhost billing plan                       # Show current plan and usage
-ifhost billing alert set --max 20         # Set spend alert at $20
-ifhost billing alert show                 # Show current alert
-ifhost billing alert off                  # Disable spend alert
-ifhost billing usage                      # Month-to-date traffic per app/site
-ifhost billing topup-traffic 100          # Buy traffic credit (USDC)
+innstance billing status                     # Current subscription status
+innstance billing subscribe hobby            # Subscribe to a plan (hobby, pro, team)
+innstance billing subscribe --plan pro --pay crypto   # Specify payment method
+innstance billing cancel                     # Cancel subscription
+innstance billing cancel-change              # Call off a queued plan change, keep the current plan
+innstance billing invoices                   # Payments: what the card was charged, and when
+innstance billing plan                       # Show current plan and usage
+innstance billing alert set --max 20         # Set spend alert at $20
+innstance billing alert show                 # Show current alert
+innstance billing alert off                  # Disable spend alert
+innstance billing usage                      # Month-to-date traffic per app/site
+innstance billing topup-traffic 100          # Buy traffic credit (USDC)
 ```
 
 ### Traffic: seeing it, and paying before it bites
 
 Every plan includes a monthly traffic allowance — read the account's own from
-`ifhost status`, never from memory. It is an **origin** allowance, and apps and
+`innstance status`, never from memory. It is an **origin** allowance, and apps and
 published sites draw on the **same pool**. Past it, apps and sites serve a 429 limit
 page instead of content — the site stays up, the content does not.
 
 Check before a launch you expect to spike, not after:
 
 ```bash
-ifhost status                             # allowance, used, and any credit
-ifhost billing usage                      # month-to-date, per app and site
+innstance status                             # allowance, used, and any credit
+innstance billing usage                      # month-to-date, per app and site
 ```
 
 If they expect heavy traffic, buy credit ahead of time; unused credit never
@@ -1127,9 +1129,9 @@ expires. The rate, the step size and the minimum are printed by the command
 itself — run its help rather than quoting a price:
 
 ```bash
-ifhost billing topup-traffic --help       # current rate, minimum, and step size
+innstance billing topup-traffic --help       # current rate, minimum, and step size
 test -n "$IFHOST_TOPUP_SIGNING_KEY"       # load it out-of-band; never type it into shell history
-ifhost billing topup-traffic <GB>         # cost is quoted before it charges
+innstance billing topup-traffic <GB>         # cost is quoted before it charges
 ```
 
 Without the signing key, `--json` prints the raw payment challenge so an
@@ -1143,22 +1145,22 @@ live at `/dashboard/app` under the plan card.
   dashboard gets no notice at all.
 - Sites also have a **per-day** ceiling separate from the monthly pool.
   A 429 from that one is not fixed by buying traffic credit — check
-  `ifhost status` to see which limit was hit before recommending a purchase.
+  `innstance status` to see which limit was hit before recommending a purchase.
 
 `subscribe` opens a hosted checkout page (pick card or crypto there). Card
 payments are coming soon; crypto (USDC) works today. `--pay crypto` is a
 compatibility spelling that still lands on the same hosted checkout.
 
-Already subscribed? The same `ifhost billing subscribe <plan>` switches
+Already subscribed? The same `innstance billing subscribe <plan>` switches
 plans in place: an upgrade applies immediately and charges the saved
 payment method only the prorated difference for the rest of the paid
 period; a downgrade takes effect when the paid period ends and charges
 nothing until then. An upgrade asks for confirmation with the estimated
 charge before anything is billed — in `--json` mode pass `--yes` to
 authorize it, or the switch is refused. Leaving for free is
-`ifhost billing cancel`. A queued downgrade can be called off before it lands
-with `ifhost billing cancel-change`, which keeps the current plan. Before a
-downgrade, run `ifhost billing fit <plan>` to see whether everything you
+`innstance billing cancel`. A queued downgrade can be called off before it lands
+with `innstance billing cancel-change`, which keeps the current plan. Before a
+downgrade, run `innstance billing fit <plan>` to see whether everything you
 run fits the target and what deleting each resource would free — apps that
 do not fit when the change lands are paused, newest first.
 
@@ -1200,7 +1202,7 @@ under `/data`.
 **Secrets:** Pass a protected reference via `--secret`, not a literal value or
 a tracked TOML file:
 ```bash
-ifhost deploy --secret API_KEY=@env:API_KEY --secret BOT_TOKEN=@file:/run/secrets/bot-token
+innstance deploy --secret API_KEY=@env:API_KEY --secret BOT_TOKEN=@file:/run/secrets/bot-token
 ```
 
 ---
@@ -1209,19 +1211,19 @@ ifhost deploy --secret API_KEY=@env:API_KEY --secret BOT_TOKEN=@file:/run/secret
 
 ### Node.js / Python API
 ```bash
-ifhost init --app my-api --port 3000 --memory 512 --storage local
-ifhost deploy --env DATABASE_URL=postgres://...
-ifhost machines install --app my-api curl git nodejs npm
-ifhost machines push ./ --to /data/app --app my-api --yes-replace
-ifhost machines exec --app my-api -- sh -c "cd /data/app && npm install"
-ifhost machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
+innstance init --app my-api --port 3000 --memory 512 --storage local
+innstance deploy --env DATABASE_URL=postgres://...
+innstance machines install --app my-api curl git nodejs npm
+innstance machines push ./ --to /data/app --app my-api --yes-replace
+innstance machines exec --app my-api -- sh -c "cd /data/app && npm install"
+innstance machines exec --app my-api -- sh -c "cd /data/app && setsid nohup node server.js </dev/null > /tmp/app.log 2>&1 &"
 curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${IFHOST_PUBLIC_URL}/"   # must print 200
 ```
 
 ### Heavy app (AI agent, ML model, slow boot)
 ```bash
-ifhost init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1 --storage local
-ifhost deploy --secret OPENAI_API_KEY=@env:OPENAI_API_KEY
+innstance init --app my-agent --port 3000 --memory 1024 --cpus 2 --autostop=false --min-machines 1 --storage local
+innstance deploy --secret OPENAI_API_KEY=@env:OPENAI_API_KEY
 # Then drive the project's own install via exec/console (see Interactive setup)
 ```
 
@@ -1248,30 +1250,30 @@ NODE_ENV = "production"
 ```
 
 ```bash
-ifhost deploy \
+innstance deploy \
   --secret TELEGRAM_BOT_TOKEN=@env:TELEGRAM_BOT_TOKEN \
   --secret OPENAI_API_KEY=@env:OPENAI_API_KEY \
   --env TELEGRAM_CHAT_ID=623508703
-ifhost machines push ./ --to /data/app --app my-bot --yes-replace
-ifhost machines exec --app my-bot -- sh -c "cd /data/app && npm install"
-ifhost machines exec --app my-bot -- sh -c "cd /data/app && setsid nohup node server.js --bind lan --port 3000 > /tmp/app.log 2>&1 < /dev/null &"
+innstance machines push ./ --to /data/app --app my-bot --yes-replace
+innstance machines exec --app my-bot -- sh -c "cd /data/app && npm install"
+innstance machines exec --app my-bot -- sh -c "cd /data/app && setsid nohup node server.js --bind lan --port 3000 > /tmp/app.log 2>&1 < /dev/null &"
 ```
 
 ### Interactive setup (runner mode)
 ```bash
-ifhost init --app my-project --port 3000 --memory 1024 --storage local
-ifhost deploy
+innstance init --app my-project --port 3000 --memory 1024 --storage local
+innstance deploy
 # Then use console for setup:
-ifhost machines console start --app my-project -- bash
-ifhost machines console input --app my-project $SID "git clone ... /data/app && cd /data/app && npm install; echo __DONE__"
+innstance machines console start --app my-project -- bash
+innstance machines console input --app my-project $SID "git clone ... /data/app && cd /data/app && npm install; echo __DONE__"
 # Poll output, then start the app in a detached tmux session
 ```
 
 ---
 
-## Ready-made agents (`ifhost agents`)
+## Ready-made agents (`innstance agents`)
 
-Separate from deploying your own code, ifhost hosts **ready-made AI agents**
+Separate from deploying your own code, Innstance hosts **ready-made AI agents**
 from a catalog. One of these is not an app you write: it is an agent that
 gets its own machine, its own storage and its own control panel, and talks
 to its owner in a chat app — Telegram, Discord, and on hermes also
@@ -1280,13 +1282,13 @@ hand it over.
 
 Use this when the user asks for "an AI assistant / a chatbot I can message"
 rather than for a website or an API. Everything else in this document is
-about `ifhost deploy`, which is a different product surface.
+about `innstance deploy`, which is a different product surface.
 
 ### First: read what the catalog actually asks
 
 ```bash
-ifhost agents list            # names, one line each
-ifhost agents list --json     # THE source of truth for every flag name below
+innstance agents list            # names, one line each
+innstance agents list --json     # THE source of truth for every flag name below
 ```
 
 `--json` is what you read before spawning. It carries, per agent:
@@ -1307,11 +1309,11 @@ platform, so `spawn` can refuse for two opposite reasons:
 
 - `agent_name_yours` — you already have one by that name. Spawning again
   resumes that setup where it stopped; the refusal says what state it is in.
-  Remove it instead with `ifhost agents destroy <name> --yes-irreversible`.
+  Remove it instead with `innstance agents destroy <name> --yes-irreversible`.
 - `agent_name_taken` — the name is not available for an agent. A page, an app
   and an agent each answer at `<name>.<our domain>`, so all three draw from one
   set of names: the holder may be another account, or one of THIS account's own
-  pages or apps. Run `ifhost status`, which lists both, before telling the user
+  pages or apps. Run `innstance status`, which lists both, before telling the user
   a stranger has it. Remove yours, or pick a different name.
 
 Spawning in a loop or in CI, use a name that carries the run into it
@@ -1321,9 +1323,9 @@ collides with your own leftover from the previous run.
 ### Spawning, when the owner is present (default, preferred)
 
 ```bash
-ifhost agents list                       # what's spawnable today — hermes and openclaw, and growing
-ifhost agents spawn hermes --name my-assistant
-ifhost agents spawn openclaw --name my-claw
+innstance agents list                       # what's spawnable today — hermes and openclaw, and growing
+innstance agents spawn hermes --name my-assistant
+innstance agents spawn openclaw --name my-claw
 ```
 
 This prints a one-time setup link and waits. The owner opens it on any
@@ -1342,7 +1344,7 @@ When you are the key holder — the keys are already in your environment, or
 the user handed them to you deliberately — spawn without a person present:
 
 ```bash
-ifhost agents spawn hermes --name my-assistant \
+innstance agents spawn hermes --name my-assistant \
   --choose channel=telegram \
   --choose llm=openai \
   --choose openai-model=other \
@@ -1386,7 +1388,7 @@ have by scanning a code with their phone. That step needs a human with a
 phone, but everything around it works from the terminal:
 
 ```bash
-ifhost agents whatsapp pair my-assistant     # prints a scannable QR, waits, switches the agent on
+innstance agents whatsapp pair my-assistant     # prints a scannable QR, waits, switches the agent on
 ```
 
 Codes expire every few seconds; the command draws fresh ones and starts a
@@ -1401,7 +1403,7 @@ replaced underneath, so an unchanged code proves nothing on its own.
 If the command reaches its deadline it says no scan landed and names both
 possibilities, because they cannot be told apart from outside: either nobody
 scanned, or a scan did land and the session had already gone. If the owner says
-they DID scan, restart the agent with `ifhost agents reconfigure <name>` — which
+they DID scan, restart the agent with `innstance agents reconfigure <name>` — which
 keeps everything it remembers — and run the pair command again. Do NOT destroy
 and respawn the agent for this, and do not report the spawn as failed.
 
@@ -1421,10 +1423,10 @@ so an agent nobody has scanned is an agent nobody can talk to.
 ### After it is spawned
 
 ```bash
-ifhost agents status                    # all your agents
-ifhost agents status my-assistant       # one agent, with its verify result
-ifhost agents logs my-assistant         # its recent log, credentials redacted
-ifhost agents logs my-assistant --lines 500
+innstance agents status                    # all your agents
+innstance agents status my-assistant       # one agent, with its verify result
+innstance agents logs my-assistant         # its recent log, credentials redacted
+innstance agents logs my-assistant --lines 500
 ```
 
 **One line in that log looks like a break and is not.** Shortly after an agent
@@ -1446,11 +1448,11 @@ Do not report this as a fault, do not tell the owner to reset anything, and do
 not rebuild the agent over it.
 
 ```bash
-ifhost agents reconfigure my-assistant  # change model, keys or channel
-ifhost agents panel my-assistant --private   # take the control panel off the web
-ifhost agents panel my-assistant --public    # put it back
-ifhost agents pull my-assistant              # download its memory as a backup
-ifhost agents destroy my-assistant --yes-irreversible
+innstance agents reconfigure my-assistant  # change model, keys or channel
+innstance agents panel my-assistant --private   # take the control panel off the web
+innstance agents panel my-assistant --public    # put it back
+innstance agents pull my-assistant              # download its memory as a backup
+innstance agents destroy my-assistant --yes-irreversible
 ```
 
 `agents pull` archives the agent's state (memory, conversations,
@@ -1467,13 +1469,13 @@ everything the agent remembers.
 ### A shell on the agent's machine
 
 ```bash
-ifhost agents ssh my-assistant                      # interactive shell
-ifhost agents ssh my-assistant -- docker ps         # run one command and exit
-ifhost agents ssh my-assistant -- docker exec agent sh -c 'ls /opt/data'
-ifhost agents ssh my-assistant --print-config >> ~/.ssh/config   # once
+innstance agents ssh my-assistant                      # interactive shell
+innstance agents ssh my-assistant -- docker ps         # run one command and exit
+innstance agents ssh my-assistant -- docker exec agent sh -c 'ls /opt/data'
+innstance agents ssh my-assistant --print-config >> ~/.ssh/config   # once
 scp file.txt my-assistant.agent.ifhost:                          # then any ssh tool
-ifhost agents exec my-assistant -- docker ps                     # no ssh client needed
-ifhost agents exec my-assistant --in-agent -- openclaw config get agents.defaults.model
+innstance agents exec my-assistant -- docker ps                     # no ssh client needed
+innstance agents exec my-assistant --in-agent -- openclaw config get agents.defaults.model
 ```
 
 `agents exec` is the shape for you: no ssh client, no key, no terminal — the
@@ -1493,7 +1495,7 @@ of the `llm` question, so it is set up like any other provider:
 # the owner runs this on THEIR computer, where Claude Code is signed in:
 #   claude setup-token        → prints a long token once
 export CLAUDE_CODE_OAUTH_TOKEN=...      # in your shell, never in argv
-ifhost agents spawn openclaw --name my-claw \
+innstance agents spawn openclaw --name my-claw \
   --choose channel=telegram --choose llm=claude-code \
   --set CLAUDE_MODEL=claude-opus-5 \
   --set-from-env TELEGRAM_BOT_TOKEN --set-from-env TELEGRAM_ALLOWED_USERS \
@@ -1528,7 +1530,7 @@ answer — and only then reports `running`. `spawn` already waits for that, so
 its success means the agent genuinely replied, not merely that a machine
 exists. The probe can also check the messaging gateway and public control
 panel. `verify-failed` means a verification check failed; it does not identify
-the cause. Read the report printed by spawn, or run `ifhost agents status <name>`,
+the cause. Read the report printed by spawn, or run `innstance agents status <name>`,
 before changing credentials or restarting the agent. Follow the failed check's
 recovery instructions.
 
@@ -1536,16 +1538,16 @@ recovery instructions.
 
 | Trap | What happens | What to do |
 |------|--------------|------------|
-| Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `ifhost agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
-| The agent is slow, or answered nothing | You cannot tell whether it is thinking, stuck, or never received the message | `ifhost agents logs <agent>` reads its recent log with anything credential-shaped redacted. Measured 2026-08-20 on a healthy agent: a chat message through the control panel came back in ~3.5s, while the SAME agent on Telegram took 11-19s, and one message in five got no reply at all. So slowness on a messaging channel is not evidence of a broken agent, and "it never replied" is a real thing that happens — check the log before rebuilding anything. |
-| Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically and we do not hand it over — a product that produces your password on demand teaches you it is not really yours. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. If the agent cannot be asked (a WhatsApp agent has no chat until it is linked, and an agent whose key stopped working answers nothing), run `ifhost agents panel <name> --reset-password`, or press "Give it a new password" on the agent's row in the dashboard. That replaces the password and shows you nothing: the agent restarts carrying the new one and the owner asks it as before. It is the way out of that loop, not a way to read a secret. |
-| The panel refuses the first browser | "pairing required: device is not approved yet" | Only for agents whose panel asks each device for approval — `ifhost agents status <agent>` says which those are, and most recipes do not. For those that do, this is expected exactly once: the approval cannot exist until a browser has knocked, so the first load is refused and the agent admits it a moment later. Wait a couple of seconds and reload. A second computer or phone needs `ifhost agents panel <agent> --approve`. On a panel that does NOT ask for device approval, a refusal or a blank page is a real fault — do not wait it out. |
+| Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `innstance agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
+| The agent is slow, or answered nothing | You cannot tell whether it is thinking, stuck, or never received the message | `innstance agents logs <agent>` reads its recent log with anything credential-shaped redacted. Measured 2026-08-20 on a healthy agent: a chat message through the control panel came back in ~3.5s, while the SAME agent on Telegram took 11-19s, and one message in five got no reply at all. So slowness on a messaging channel is not evidence of a broken agent, and "it never replied" is a real thing that happens — check the log before rebuilding anything. |
+| Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically and we do not hand it over — a product that produces your password on demand teaches you it is not really yours. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. If the agent cannot be asked (a WhatsApp agent has no chat until it is linked, and an agent whose key stopped working answers nothing), run `innstance agents panel <name> --reset-password`, or press "Give it a new password" on the agent's row in the dashboard. That replaces the password and shows you nothing: the agent restarts carrying the new one and the owner asks it as before. It is the way out of that loop, not a way to read a secret. |
+| The panel refuses the first browser | "pairing required: device is not approved yet" | Only for agents whose panel asks each device for approval — `innstance agents status <agent>` says which those are, and most recipes do not. For those that do, this is expected exactly once: the approval cannot exist until a browser has knocked, so the first load is refused and the agent admits it a moment later. Wait a couple of seconds and reload. A second computer or phone needs `innstance agents panel <agent> --approve`. On a panel that does NOT ask for device approval, a refusal or a blank page is a real fault — do not wait it out. |
 | Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner asks their agent in chat. |
 | Spawn sits on "installing" for minutes | Nothing is wrong: that step fetches and starts the agent, and it is the longest part of a spawn | Wait it out. The step after it ("checking your keys") is short. A spawn that has genuinely stalled stops moving between steps, and the dashboard says so rather than sitting on one. |
 | One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy agent's model unknown. |
 | Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | Model names resolve through the agent's own gateway. `openclaw models list --provider <id>` inside the agent shows what it accepts right now; a newer name from a provider's public list may not be there yet. |
-| Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `ifhost agents list --json`. |
-| Assuming a free spawn is permanent | The agent disappears | An agent successfully spawned on Free carries a destruction timestamp. `spawn` prints the server's current destruction notice before setup starts — relay that notice. If the exact time matters, run `ifhost agents status <name> --json` and read `expires_at`; never copy a duration into this skill. |
+| Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `innstance agents list --json`. |
+| Assuming a free spawn is permanent | The agent disappears | An agent successfully spawned on Free carries a destruction timestamp. `spawn` prints the server's current destruction notice before setup starts — relay that notice. If the exact time matters, run `innstance agents status <name> --json` and read `expires_at`; never copy a duration into this skill. |
 | Supplying two providers | The API rejects the whole submission | Answer the provider question once and supply only that provider's key. |
 
 ---
@@ -1553,12 +1555,12 @@ recovery instructions.
 ## Agent Decision Tree
 
 **First fork: is the user asking for an app, or for an assistant?** A
-website, API or bot they wrote is `ifhost deploy`, below. "An AI I can
+website, API or bot they wrote is `innstance deploy`, below. "An AI I can
 message" is a catalog agent — see *Ready-made agents* above, and do not
 build one by hand.
 
 ```
-ifhost deploy (runner VM with a default 1 GB /data volume), then:
+innstance deploy (runner VM with a default 1 GB /data volume), then:
 ├── Simple web app        → --memory 256, transfer to /data/app, start the app
 ├── API with managed DB   → --memory 512, pass DB_URL via --env
 ├── Heavy/AI app          → --memory 1024+, --autostop=false, --min-machines 1
@@ -1593,25 +1595,25 @@ Shared volumes are on the roadmap.
 
 ```bash
 # 1. Get full app context
-ifhost describe --app my-app
+innstance describe --app my-app
 
 # 2. Check recent errors
-ifhost machines logs --app my-app --level error --lines 20
+innstance machines logs --app my-app --level error --lines 20
 
 # 3. Check if app is running
-ifhost machines --app my-app
+innstance machines --app my-app
 
 # 4. If stopped, start it
-ifhost machines start --app my-app
+innstance machines start --app my-app
 
 # 5. Watch live logs
-ifhost machines logs --app my-app
+innstance machines logs --app my-app
 
 # 6. Check one non-secret variable without dumping the process environment
-ifhost machines exec --app my-app -- sh -c 'test -n "$NODE_ENV" && echo NODE_ENV=set || echo NODE_ENV=unset'
+innstance machines exec --app my-app -- sh -c 'test -n "$NODE_ENV" && echo NODE_ENV=set || echo NODE_ENV=unset'
 
 # 7. If app won't start, check the deploy
-ifhost describe --app my-app --json | jq '.deployments[0]'
+innstance describe --app my-app --json | jq '.deployments[0]'
 ```
 
 ---
@@ -1626,13 +1628,13 @@ Read them live instead, from the source the biller itself uses:
 
 ```bash
 curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/billing/plans  # every plan, no auth needed
-ifhost status                                              # the signed-in account's plan and usage
+innstance status                                              # the signed-in account's plan and usage
 curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/llms.txt  # agent guide, pricing block rendered from the catalog
 ```
 
-Quote the account's own plan from `ifhost status`, never a remembered number.
+Quote the account's own plan from `innstance status`, never a remembered number.
 
-Upgrade: `ifhost billing subscribe <plan>` (or `ifhost sub subscribe <plan>`)
+Upgrade: `innstance billing subscribe <plan>` (or `innstance sub subscribe <plan>`)
 
 ---
 
