@@ -51,7 +51,7 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
         with path.open("a", encoding="utf-8") as stream:
             stream.write(
                 "\n```bash\n"
-                "curl --fail https://host.impossibuild.ai/install \\\n"
+                "curl --fail https://innstance.impossibuild.ai/install \\\n"
                 "  | sh\n"
                 "```\n"
             )

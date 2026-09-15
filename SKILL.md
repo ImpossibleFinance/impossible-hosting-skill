@@ -28,7 +28,7 @@ On macOS or Linux:
 
 ```bash
 set -eu
-release_origin=https://host.impossibuild.ai
+release_origin=https://innstance.impossibuild.ai
 allowed_signer='ifhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ'
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
@@ -108,7 +108,7 @@ On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ReleaseOrigin = 'https://host.impossibuild.ai'
+$ReleaseOrigin = 'https://innstance.impossibuild.ai'
 $AllowedSigner = 'ifhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ'
 $RawArch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 $Arch = switch ($RawArch) {
@@ -223,7 +223,7 @@ Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 
 ### Public URLs
 
-Use the exact public URL returned by `innstance deploy`, `innstance publish`, or the resource listing. New apps, static sites, and agent panels receive an assigned `*.fly.dev` URL. The project name does not determine that hostname. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://host.impossibuild.ai`.
+Use the exact public URL returned by `innstance deploy`, `innstance publish`, or the resource listing. New apps, static sites, and agent panels receive an assigned `*.fly.dev` URL. The project name does not determine that hostname. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
 
 In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Never guess it from the app name. Agent compute stays on AWS behind its assigned public gateway.
 
@@ -1627,9 +1627,9 @@ for weeks after the catalog moved, and called a capped limit unlimited.
 Read them live instead, from the source the biller itself uses:
 
 ```bash
-curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/billing/plans  # every plan, no auth needed
+curl --fail --silent --show-error --max-time 30 https://innstance.impossibuild.ai/billing/plans  # every plan, no auth needed
 innstance status                                              # the signed-in account's plan and usage
-curl --fail --silent --show-error --max-time 30 https://host.impossibuild.ai/llms.txt  # agent guide, pricing block rendered from the catalog
+curl --fail --silent --show-error --max-time 30 https://innstance.impossibuild.ai/llms.txt  # agent guide, pricing block rendered from the catalog
 ```
 
 Quote the account's own plan from `innstance status`, never a remembered number.

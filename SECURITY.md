@@ -11,7 +11,7 @@ Application secrets use only `KEY=@env:NAME`, `KEY=@file:PATH`, or
 
 Fresh CLI installation trusts only the SSHSIG identity committed in
 [`release-signers`](release-signers). Never download or replace that trust
-anchor from `host.impossibuild.ai`; the release origin is not a trust source.
+anchor from `innstance.impossibuild.ai`; the release origin is not a trust source.
 Treat any repository change to `release-signers` as a trust-root rotation and
 verify it out of band before accepting it.
 Download `/dl/release.txt` and `/dl/release.txt.sshsig`, verify the exact
