@@ -1,4 +1,4 @@
-# ifhost Runner Deployment Runbook
+# Innstance Runner Deployment Runbook
 
 This runbook is the ordered procedure for deploying an application with
 ifhost runner mode. `SKILL.md` remains the full reference; this file is the
@@ -540,7 +540,7 @@ The obsolete exec/base64 uploader and its 32 KiB chunks are no longer the
 project-transfer path. Current `push` and non-empty `write` commands use raw,
 verified 8 MiB chunks through an authenticated backend endpoint, which
 transfers them to the machine. The checksum headers are integrity metadata
-between the CLI and the ifhost backend; they are not secrets and are never
+between the CLI and the Innstance backend; they are not secrets and are never
 forwarded beyond it.
 
 Safe recovery is branch-specific:
