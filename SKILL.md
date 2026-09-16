@@ -599,13 +599,13 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://ifh-app-0123456789abcdef0123456789abcdef.fly.dev
+    URL:     https://my-api.fly.dev
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
 
   my-site
-    URL:     https://ifh-site-fedcba9876543210fedcba9876543210.fly.dev
+    URL:     https://my-site.fly.dev
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -625,7 +625,7 @@ innstance init --app <name> --port <port> --memory <mb> [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--app` | (required) | Resource name. Use the assigned public URL returned by the CLI |
+| `--app` | (required) | Resource name; the public address is built from it. Use the URL the CLI prints |
 | `--port` | 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
@@ -662,8 +662,8 @@ innstance deploy [flags]
 Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
 
-**After deploy:** Prints the public URL (e.g.,
-`https://ifh-app-0123456789abcdef0123456789abcdef.fly.dev`). The application is not live until you
+**After deploy:** Prints the public URL, the app's name on the platform domain (e.g.
+`https://my-api.fly.dev`). The application is not live until you
 start it and verify HTTP `200`.
 
 #### Redeploying is safe — the app keeps its address
