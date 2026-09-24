@@ -489,7 +489,7 @@ change that restarts the machine, or redeploy, then:
 
 ## 7. Verify the public routes
 
-Set `IFHOST_PUBLIC_URL` to the exact public URL returned by the CLI, without a trailing slash. New resources use assigned `*.fly.dev` hostnames. Preserve existing shared-host and custom-domain URLs. Do not construct a hostname from the app name.
+Set `IFHOST_PUBLIC_URL` to the exact public URL returned by the CLI, without a trailing slash. New resources use `https://<name>.innstance.app` addresses. Preserve existing shared-host and custom-domain URLs. Do not construct a hostname from the app name.
 
 Test the health or root route first:
 

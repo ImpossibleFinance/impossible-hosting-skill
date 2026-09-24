@@ -191,9 +191,9 @@ def verify_docs(root: Path = ROOT) -> None:
                 fail(f"{name}:{number}: token must come from stdin or --from-file")
             if re.search(r"machines\s+secrets\s+set.*--from-file", line):
                 fail(f"{name}:{number}: secrets set uses KEY=@file:PATH, not --from-file")
-            if re.search(r"https://<[A-Za-z0-9_-]+>\.host\.impossi\.build|https://[A-Za-z0-9_-]+\.host\.impossi\.build", line) and not re.search(r"alias|legacy|pre-move|formerly", line, re.I):
-                fail(f"{name}:{number}: published guidance hands out the current tenant domain "
-                     "(innstance.impossibuild.ai); host.impossibuild.ai and host.impossi.build are aliases that serves old "
+            if re.search(r"https://<?[A-Za-z0-9_-]+>?\.host\.(impossi\.build|impossibuild\.ai)", line) and not re.search(r"alias|legacy|pre-move|formerly|retired", line, re.I):
+                fail(f"{name}:{number}: published guidance hands out tenant addresses on innstance.app; "
+                     "host.impossibuild.ai and host.impossi.build are retired suffixes that only redirect old "
                      "URLs, never a name we publish - mark the line as legacy if it must appear")
             if re.search(r"\bcurl\b.*https://", line) and "--max-time" not in line and not line.endswith("\\"):
                 fail(f"{name}:{number}: one-line HTTP examples need a hard deadline")
