@@ -223,7 +223,7 @@ Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 
 ### Public URLs
 
-Use the exact public URL returned by `innstance deploy`, `innstance publish`, `innstance sites lock`, or the resource listing. New apps, static sites, and agent panels get an address built from their name, `https://<name>.fly.dev`, and the name check states it before anything is uploaded (`GET /sites/check-name?name=` returns `url`). Names are global across every account: a name the public namespace refuses is reported as taken (`NAME_TAKEN`) and the claim is released, so pick another. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
+Use the exact public URL returned by `innstance deploy`, `innstance publish`, `innstance sites lock`, or the resource listing. New apps, static sites, and agent panels get an address built from their name, `https://<name>.innstance.app`, and the name check states it before anything is uploaded (`GET /sites/check-name?name=` returns `url`). Names are global across every account: a name the public namespace refuses is reported as taken (`NAME_TAKEN`) and the claim is released, so pick another. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. Addresses handed out earlier under another domain, including the retired `*.host.impossibuild.ai`, redirect to the same name on `innstance.app`. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
 
 In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Read it from the command's output rather than composing it, so an older resource on a shared-host URL is not mistaken for a new one. Agent compute stays on AWS behind its public gateway.
 
@@ -599,13 +599,13 @@ CLI:          20260421-123154
 Projects (2):
 
   my-api
-    URL:     https://my-api.fly.dev
+    URL:     https://my-api.innstance.app
     Status:  deployed   Region: iad
     Running (1):
       e784160df242e8
 
   my-site
-    URL:     https://my-site.fly.dev
+    URL:     https://my-site.innstance.app
     Status:  deployed   Region: iad
     Running (1):
       d8930e1c063d58
@@ -663,7 +663,7 @@ Deploy boots a generic Debian runner VM without building the application.
 Drive setup via `exec`/`write`/`console` after deploy.
 
 **After deploy:** Prints the public URL, the app's name on the platform domain (e.g.
-`https://my-api.fly.dev`). The application is not live until you
+`https://my-api.innstance.app`). The application is not live until you
 start it and verify HTTP `200`.
 
 #### Redeploying is safe — the app keeps its address
@@ -930,7 +930,7 @@ Rules that change what an agent should do:
   removes the files at once; the name is kept for the owner to reclaim for
   a while (the reply says how long), then anyone may take it. Deletion is
   immediate and irreversible — say so to the user before confirming.
-- The address IS the name: `https://<name>.fly.dev`. When the user needs
+- The address IS the name: `https://<name>.innstance.app`. When the user needs
   the address before the files exist (to configure something against it),
   `innstance sites lock <name>` claims it and prints the address; a later
   `publish --name <name>` only uploads. An account may hold only a few
