@@ -36,6 +36,15 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
         self.assertIn(old, text)
         path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
+    def assert_rejected_when_appended(self, name: str, snippet: str) -> None:
+        path = self.root / name
+        original = path.read_text(encoding="utf-8")
+        try:
+            path.write_text(original + snippet, encoding="utf-8")
+            self.assert_rejected(verify.verify_docs)
+        finally:
+            path.write_text(original, encoding="utf-8")
+
     def test_current_guidance_passes(self) -> None:
         verify.verify_metadata(self.root)
         verify.verify_docs(self.root)
@@ -81,6 +90,19 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
         with path.open("a", encoding="utf-8") as stream:
             stream.write("\nFetch https://downloads.example/release.txt.\n")
         self.assert_rejected(verify.verify_docs)
+
+    def test_spellings_the_cli_lacks_are_rejected(self) -> None:
+        cases = (
+            ("panel password reset", "SKILL.md",
+             "\nRun `innstance agents panel my-agent --reset-password`.\n"),
+            ("logs follow flag", "RUNBOOK.md",
+             "\nWatch with `innstance machines logs --app my-app --follow`.\n"),
+            ("literal login token", "README.md",
+             "\n```bash\ninnstance login --token abc123\n```\n"),
+        )
+        for label, name, snippet in cases:
+            with self.subTest(label):
+                self.assert_rejected_when_appended(name, snippet)
 
     def test_public_bootstrap_drift_is_rejected(self) -> None:
         self.replace(

@@ -19,6 +19,20 @@ TRUST_ANCHOR = (
     "ifhost ssh-ed25519 "
     "AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ"
 )
+# Spellings the skill once taught that the CLI never accepted. Each one sent
+# agents into an "unknown flag" loop; the reason names what the CLI does
+# instead, so the failure message is the fix.
+NONEXISTENT_SPELLINGS = (
+    (
+        re.compile(r"--reset-password\b"),
+        "agents panel has no --reset-password; the owner reveals the password once "
+        "(--show-password or the dashboard) and changes it in the panel",
+    ),
+    (
+        re.compile(r"machines\s+logs\b[^\n`]*--follow\b"),
+        "machines logs has no --follow; it streams by default until stopped",
+    ),
+)
 
 
 def fail(message: str) -> None:
@@ -186,7 +200,10 @@ def verify_docs(root: Path = ROOT) -> None:
             for match in secret_command.finditer(line):
                 if not safe_secret.fullmatch(match.group(1)):
                     fail(f"{name}:{number}: literal secret example is forbidden")
-            token_login = re.search(r"ifhost\s+login\s+--token(?:=|\s+)([^\s`|]+)", line)
+            for pattern, reason in NONEXISTENT_SPELLINGS:
+                if pattern.search(line):
+                    fail(f"{name}:{number}: {reason}")
+            token_login = re.search(r"(?:innstance|ifhost)\s+login\s+--token(?:=|\s+)([^\s`|]+)", line)
             if token_login and token_login.group(1) != "-":
                 fail(f"{name}:{number}: token must come from stdin or --from-file")
             if re.search(r"machines\s+secrets\s+set.*--from-file", line):

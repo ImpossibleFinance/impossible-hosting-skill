@@ -231,7 +231,7 @@ In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, wi
 
 `innstance deploy` succeeding means the VM is provisioned, NOTHING more. The
 VM boots as a bare shell with no app process; the CLI prints "Runner VM
-ready — your app is NOT live yet". You are done only when ALL of:
+ready." and then "Your app is NOT live yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
    `innstance machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
@@ -409,7 +409,7 @@ A fresh deploy is NOT "ready to serve" the moment `innstance deploy` returns. Ex
 Implications for you as the agent driving the deploy:
 
 - A single "HTTP probe failed after 60s" is **not sufficient evidence** to conclude the deploy is broken. Only conclude broken if the logs show crash signatures (`Exec format error`, `max restart count`, `Main child exited with code: 1`, OOM kill, port-mismatch refused-connection that persists >3 min after the app should have started).
-- When the probe comes back "no response yet" for a known-slow stack (anything with "plugin" or "agent" or "gateway" in its name), print a friendly **"still initializing, this can take up to 15 min for <stack>; watch with `innstance machines logs --app X --follow`"** — not a failure.
+- When the probe comes back "no response yet" for a known-slow stack (anything with "plugin" or "agent" or "gateway" in its name), print a friendly **"still initializing, this can take up to 15 min for <stack>; watch with `innstance machines logs --app X`"** (it streams until stopped) — not a failure.
 - The `innstance deploy` command distinguishes "still starting" (exit 0, warn) from "broken" (exit 1, error). Trust its exit code; don't treat every warning as a deploy failure.
 - Ask the user to wait 10-15 min before concluding "the bot doesn't work" on the first message. Subsequent messages are fast.
 - Retry loops inside the app (e.g. openclaw's setWebhook call to Telegram) can compound the wait. A single outbound flake from the host region can reset app init by 30s. That's an app-level issue, not ours — document it, don't treat it as our deploy being broken.
@@ -627,9 +627,9 @@ innstance init --app <name> --port <port> --memory <mb> [flags]
 |------|---------|-------------|
 | `--app` | (required) | Resource name; the public address is built from it. Use the URL the CLI prints |
 | `--port` | 8080 | Port the app listens on |
-| `--memory` | 256 | RAM in MB (256, 512, 1024, 2048, 4096) |
+| `--memory` | 256 | RAM in MB, rounded up to the next supported size (256, 512, 1024, 2048, 4096, 8192) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
-| `--cpu-kind` | shared | `shared` or `performance` |
+| `--cpu-kind` | shared | `shared` or `performance`. Performance is not on every plan; `innstance billing plans` shows which |
 | `--cmd` | (none) | DEPRECATED — writes `[build] cmd`, which deploys ignore. Start apps via `machines exec` instead |
 | `--autostop` | false | Always-on is the platform default. Only set `true` for apps that may die on idle — runner apps do NOT survive an idle-stop (VM wakes with no app process) |
 | `--min-machines` | 0 | With the always-on default this rarely needs setting; pairs with explicit autostop |
@@ -756,7 +756,7 @@ Shows machines grouped by state with IDs for targeting.
 
 ```bash
 innstance machines start --app my-app
-innstance machines stop --app my-app       # No cost while stopped
+innstance machines stop --app my-app       # Stops the VM; its memory still counts toward the plan's pool
 innstance machines restart --app my-app
 ```
 
@@ -1107,12 +1107,12 @@ installed.
 
 ```bash
 innstance billing status                     # Current subscription status
-innstance billing subscribe hobby            # Subscribe to a plan (hobby, pro, team)
+innstance billing subscribe hobby            # Subscribe to a plan (hobby, pro, team; team is shown as Studio)
 innstance billing subscribe --plan pro --pay crypto   # Specify payment method
 innstance billing cancel                     # Cancel subscription
 innstance billing cancel-change              # Call off a queued plan change, keep the current plan
 innstance billing invoices                   # Payments: what the card was charged, and when
-innstance billing plan                       # Show current plan and usage
+innstance billing plans                      # Every plan and what it includes, read live
 innstance billing alert set --max 20         # Set spend alert at $20
 innstance billing alert show                 # Show current alert
 innstance billing alert off                  # Disable spend alert
@@ -1193,7 +1193,7 @@ min_machines = 1                   #   set true for runner apps that must stay
 [resources]
 cpu_kind = "shared"                # "shared" or "performance"
 cpus = 2                           # 1, 2, 4, 8
-memory_mb = 1024                   # 256, 512, 1024, 2048, 4096
+memory_mb = 1024                   # 256, 512, 1024, 2048, 4096, 8192
 
 # NOTE: no [build] section — Dockerfiles and build/start commands are not
 # supported and are ignored if present. Start the app via machines exec.
@@ -1333,7 +1333,7 @@ collides with your own leftover from the previous run.
 ### Spawning, when the owner is present (default, preferred)
 
 ```bash
-innstance agents list                       # what's spawnable today — hermes and openclaw, and growing
+innstance agents list                       # what the catalog offers today
 innstance agents spawn hermes --name my-assistant
 innstance agents spawn openclaw --name my-claw
 ```
@@ -1550,9 +1550,9 @@ recovery instructions.
 |------|--------------|------------|
 | Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `innstance agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
 | The agent is slow, or answered nothing | You cannot tell whether it is thinking, stuck, or never received the message | `innstance agents logs <agent>` reads its recent log with anything credential-shaped redacted. Measured 2026-08-20 on a healthy agent: a chat message through the control panel came back in ~3.5s, while the SAME agent on Telegram took 11-19s, and one message in five got no reply at all. So slowness on a messaging channel is not evidence of a broken agent, and "it never replied" is a real thing that happens — check the log before rebuilding anything. |
-| Asking for the panel password | You will not find it, and you should not | The control panel's sign-in is provisioned automatically and we do not hand it over — a product that produces your password on demand teaches you it is not really yours. The owner asks their own agent in chat: "what is my dashboard password?" Do not try to retrieve it for them. If the agent cannot be asked (a WhatsApp agent has no chat until it is linked, and an agent whose key stopped working answers nothing), run `innstance agents panel <name> --reset-password`, or press "Give it a new password" on the agent's row in the dashboard. That replaces the password and shows you nothing: the agent restarts carrying the new one and the owner asks it as before. It is the way out of that loop, not a way to read a secret. |
+| Asking for the panel password | You cannot read it, and you should not | The control panel's sign-in is provisioned automatically and only its owner sees it, once. The owner presses "Reveal password" on the agent's row in the dashboard, or runs `innstance agents panel <name> --show-password`, which saves it to an owner-only file (`<name>-dashboard-password.txt`) in the current directory and prints only the file name. If you ran that command, tell the owner where the file is and do not open, print or copy it yourself. The reveal works once: after that the password is changed from the agent's own control panel. No `innstance` command resets it or prints it. |
 | The panel refuses the first browser | "pairing required: device is not approved yet" | Only for agents whose panel asks each device for approval — `innstance agents status <agent>` says which those are, and most recipes do not. For those that do, this is expected exactly once: the approval cannot exist until a browser has knocked, so the first load is refused and the agent admits it a moment later. Wait a couple of seconds and reload. A second computer or phone needs `innstance agents panel <agent> --approve`. On a panel that does NOT ask for device approval, a refusal or a blank page is a real fault — do not wait it out. |
-| Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner asks their agent in chat. |
+| Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner reveals the password once, from the dashboard or with `--show-password`. |
 | Spawn sits on "installing" for minutes | Nothing is wrong: that step fetches and starts the agent, and it is the longest part of a spawn | Wait it out. The step after it ("checking your keys") is short. A spawn that has genuinely stalled stops moving between steps, and the dashboard says so rather than sitting on one. |
 | One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy agent's model unknown. |
 | Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | Model names resolve through the agent's own gateway. `openclaw models list --provider <id>` inside the agent shows what it accepts right now; a newer name from a provider's public list may not be there yet. |
