@@ -139,6 +139,12 @@ def verify_metadata(root: Path = ROOT) -> None:
     skill = (root / "SKILL.md").read_text(encoding="utf-8")
     if not skill.startswith("---\n") or "\nname: innstance\n" not in skill[:500]:
         fail("SKILL.md must carry innstance front matter")
+    # Rule 0 compares this copy with what `innstance skill sync` installs, so
+    # an agent that read a newer guide is not walked back to the CLI's older
+    # pin. That only works while the file states the manifest's version.
+    if f"This copy is version `{manifest['version']}`." not in skill:
+        fail(f"SKILL.md must say \"This copy is version `{manifest['version']}`.\" "
+             "to match manifest.json")
 
     anchor_path = root / "release-signers"
     if not anchor_path.is_file() or anchor_path.is_symlink():

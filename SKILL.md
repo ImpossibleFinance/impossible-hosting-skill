@@ -384,9 +384,13 @@ followed by `innstance skill sync`.
 ### 0. Refresh these instructions first, every session
 
 With the CLI, run `innstance version` and then `innstance skill sync` before
-anything else. `skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
-paths. If this file was loaded from another path, read those refreshed files
-now and continue from them. If the sync fails (network, outage), keep working
+anything else. `skill sync` prints the skill version it installed and the paths
+of its cached `SKILL.md` and `RUNBOOK.md`. This copy is version `20261102-1`.
+Versions are `YYYYMMDD-N` and sort in that order. If this file was loaded from
+another path and the synced version is the same or newer, read those refreshed
+files now and continue from them. If the synced version is older, this CLI
+pins an earlier guide than the one you are reading: keep following this copy.
+If the sync fails (network, outage), keep working
 from the copy you already have and mention the failed refresh to the user — a
 slightly stale bundle is safe; guessed instructions are not.
 

@@ -55,6 +55,12 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
         )
         self.assert_rejected(verify.verify_metadata)
 
+    def test_manifest_version_bump_without_the_guide_is_rejected(self) -> None:
+        (self.root / "manifest.json").write_text(
+            '{\n  "version": "20991231-1"\n}\n', encoding="utf-8"
+        )
+        self.assert_rejected(verify.verify_metadata)
+
     def test_multiline_curl_pipe_is_rejected(self) -> None:
         path = self.root / "README.md"
         with path.open("a", encoding="utf-8") as stream:
