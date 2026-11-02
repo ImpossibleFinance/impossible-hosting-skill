@@ -104,6 +104,37 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
             with self.subTest(label):
                 self.assert_rejected_when_appended(name, snippet)
 
+    def test_unsafe_mcp_and_npx_guidance_is_rejected(self) -> None:
+        cases = (
+            ("MCP endpoint on a tenant address", "SKILL.md",
+             "\nConnect to https://my-app.innstance.app/mcp instead.\n"),
+            ("MCP endpoint on another origin", "SECURITY.md",
+             "\nThe MCP server also answers at https://mcp.example/mcp.\n"),
+            ("literal bearer token", "README.md",
+             '\n```json\n{"headers": {"Authorization": "Bearer abc123"}}\n```\n'),
+            ("a similarly named npm package", "RUNBOOK.md",
+             "\n```bash\nnpx --yes innstance-cli\n```\n"),
+            ("the old command name on npm", "SKILL.md",
+             "\nOr run `npx ifhost` instead.\n"),
+        )
+        for label, name, snippet in cases:
+            with self.subTest(label):
+                self.assert_rejected_when_appended(name, snippet)
+
+    def test_guides_lead_with_mcp_and_npx(self) -> None:
+        for name in verify.BOOTSTRAP_DOCS:
+            for way_in in (verify.MCP_ENDPOINT, verify.NPX_COMMAND):
+                with self.subTest(name=name, way_in=way_in):
+                    path = self.root / name
+                    original = path.read_text(encoding="utf-8")
+                    try:
+                        # Mentioned only after the CLI bootstrap: the CLI leads.
+                        moved = original.replace(way_in, "the other way in")
+                        path.write_text(moved + f"\nSee {way_in}.\n", encoding="utf-8")
+                        self.assert_rejected(verify.verify_docs)
+                    finally:
+                        path.write_text(original, encoding="utf-8")
+
     def test_public_bootstrap_drift_is_rejected(self) -> None:
         self.replace(
             "RUNBOOK.md",

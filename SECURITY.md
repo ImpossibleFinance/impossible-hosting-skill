@@ -9,6 +9,17 @@ arguments, chat transcripts, tracked manifests, or uploaded source trees.
 Application secrets use only `KEY=@env:NAME`, `KEY=@file:PATH`, or
 `KEY=@stdin`; CLI login tokens use stdin or `--from-file`.
 
+The remote MCP server is trusted only at `https://innstance.impossibuild.ai/mcp`,
+on the control plane. An MCP endpoint under a tenant address is a customer's
+application, never Innstance. MCP clients read the API token from an
+environment variable at connection time; configuration examples carry the
+variable's name, never a token value.
+
+Run `npx innstance` only when the npm registry shows a provenance attestation
+and names `github.com/ImpossibleFinance/impossible-hosting-cli` as the
+package's repository. A package without provenance, or one with a similar
+name, is not ours.
+
 Fresh CLI installation trusts only the SSHSIG identity committed in
 [`release-signers`](release-signers). Never download or replace that trust
 anchor from `innstance.impossibuild.ai`; the release origin is not a trust source.

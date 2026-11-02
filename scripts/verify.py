@@ -15,6 +15,12 @@ BOOTSTRAP_DOCS = ("README.md", "RUNBOOK.md", "SKILL.md")
 BOOTSTRAP_BEGIN = "<!-- BEGIN VERIFIED CLI BOOTSTRAP -->"
 BOOTSTRAP_END = "<!-- END VERIFIED CLI BOOTSTRAP -->"
 RELEASE_ORIGIN = "https://innstance.impossibuild.ai"
+# The MCP server lives on the control plane, a different registrable domain
+# from the tenant suffix, so no customer app can stand in for it. The public
+# guides lead with it and with npx; the CLI bootstrap comes after both.
+MCP_ENDPOINT = RELEASE_ORIGIN + "/mcp"
+NPX_COMMAND = "npx innstance"
+NPX_PACKAGE = re.compile(r"innstance(?:@[0-9A-Za-z.+-]+)?")
 TRUST_ANCHOR = (
     "ifhost ssh-ed25519 "
     "AAAAC3NzaC1lZDI1NTE5AAAAIEv+FR+Wibo0JJPEmmJfqQz2wsoBkrCLatDZ8XwZq2zJ"
@@ -137,6 +143,10 @@ def verify_docs(root: Path = ROOT) -> None:
         ),
     }
 
+    mcp_url = re.compile(r"https://[^\s`'\"()<>]+/mcp(?![\w/-]|\.\w)", re.I)
+    npx_invocation = re.compile(r"(?<![\w-])npx\s+(?:-{1,2}[\w-]+\s+)*([^\s`]+)")
+    bearer_value = re.compile(r"\bBearer\s+([^\s\"'`]+)")
+
     canonical_bootstrap: str | None = None
 
 
@@ -152,10 +162,19 @@ def verify_docs(root: Path = ROOT) -> None:
         for match in release_resource.finditer(text):
             if not match.group(0).startswith(RELEASE_ORIGIN + "/dl/"):
                 fail(f"{name}: release resources must use the active {RELEASE_ORIGIN}/dl channel")
+        for match in mcp_url.finditer(text):
+            if match.group(0) != MCP_ENDPOINT:
+                fail(f"{name}: the MCP server is {MCP_ENDPOINT} on the control plane, "
+                     f"never {match.group(0)}")
 
         if name in BOOTSTRAP_DOCS:
             if text.count(BOOTSTRAP_BEGIN) != 1 or text.count(BOOTSTRAP_END) != 1:
                 fail(f"{name}: expected exactly one verified CLI bootstrap")
+            for way_in in (MCP_ENDPOINT, NPX_COMMAND):
+                position = text.find(way_in)
+                if position < 0 or position > text.index(BOOTSTRAP_BEGIN):
+                    fail(f"{name}: lead with {way_in} before the CLI bootstrap; "
+                         "the CLI is the power-user path")
             bootstrap = text.split(BOOTSTRAP_BEGIN, 1)[1].split(BOOTSTRAP_END, 1)[0]
             for required in required_bootstrap:
                 if required not in bootstrap:
@@ -200,6 +219,16 @@ def verify_docs(root: Path = ROOT) -> None:
             for match in secret_command.finditer(line):
                 if not safe_secret.fullmatch(match.group(1)):
                     fail(f"{name}:{number}: literal secret example is forbidden")
+            for match in bearer_value.finditer(line):
+                if not match.group(1).startswith("${"):
+                    fail(f"{name}:{number}: an MCP bearer token comes from an environment "
+                         "variable the client expands, never a value in the file")
+            code = [line] if fence_language is not None else re.findall(r"`([^`]+)`", line)
+            for snippet in code:
+                for match in npx_invocation.finditer(snippet):
+                    if not NPX_PACKAGE.fullmatch(match.group(1)):
+                        fail(f"{name}:{number}: npx runs only the innstance package, "
+                             f"never {match.group(1)!r}")
             for pattern, reason in NONEXISTENT_SPELLINGS:
                 if pattern.search(line):
                     fail(f"{name}:{number}: {reason}")

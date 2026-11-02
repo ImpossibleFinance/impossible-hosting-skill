@@ -14,7 +14,26 @@ A deployment is complete only when:
 4. Any user-requested representative routes also return their expected
    status and content type.
 
-`innstance deploy` provisioning a VM is not evidence that the app is live.
+`innstance deploy` provisioning a VM is not evidence that the app is live,
+and neither is a deploy through MCP.
+
+## Ways in
+
+Use the first that works where you are running. The definition of done above
+is the same for all three.
+
+1. The remote MCP server at `https://innstance.impossibuild.ai/mcp`. If your
+   tool list has tools from the `innstance` server, use them, and read their
+   names from the server's own tool list. Where a step below names a CLI
+   command, call the tool that does the same thing.
+2. `npx innstance`, which signs in and sets up the MCP server and the skill.
+   Check its provenance first, as `SKILL.md` describes under
+   "`npx innstance`".
+3. The `innstance` CLI, for power users, scripts and CI, and any step the MCP
+   tool list does not offer. Install it with the verified bootstrap below.
+
+If the MCP endpoint answers `404`, or npm reports that the package does not
+exist, that way in is not available yet: use the CLI and tell the user.
 
 ## Guardrails
 

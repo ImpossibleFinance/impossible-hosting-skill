@@ -1,17 +1,110 @@
 ---
 name: innstance
-description: Deploy applications to Innstance runner VMs. Use when Codex needs to provision an app with innstance, translate project setup into runner commands, transfer source safely, start the process, or verify and troubleshoot the public deployment.
+description: Put what an agent built live on Innstance, through its remote MCP server, npx innstance, or the innstance CLI. Use when an agent needs to publish a page or files, deploy an app to a runner VM, connect a custom domain, run a hosted assistant, or verify and troubleshoot what is live.
 ---
 
-# innstance — Deploy to Innstance
+# innstance — Put it live on Innstance
 
-Provision an isolated runner VM and HTTPS URL, then install, transfer, start,
-and verify the application explicitly. Use [RUNBOOK.md](RUNBOOK.md) for the
-ordered deployment and recovery procedure.
+Innstance gives what you built a live HTTPS address: a published page or
+files, an app on an isolated runner VM, a custom domain, or a hosted
+assistant. Use [RUNBOOK.md](RUNBOOK.md) for the ordered runner deployment and
+recovery procedure.
 
-## Agent Rules
+## Ways in
 
-### 0. Refresh the CLI and these instructions first, every session
+Three front doors reach the same account and the same resources. Use the
+first one that works where you are running:
+
+| Way in | Needs | Use it for |
+|--------|-------|------------|
+| Remote MCP server, `https://innstance.impossibuild.ai/mcp` | An MCP client that speaks Streamable HTTP, and an Innstance API token | Everything its tool list offers, with nothing to install |
+| `npx innstance` | Node.js 18 or newer, and the user at a browser once | Signing in and setting up the MCP server and this skill in one step |
+| The `innstance` CLI | The signed native binary on macOS or Linux | Power users, scripts and CI, and any step the MCP tool list does not offer |
+
+The rules in this file hold whichever door you use: a deploy is not live until
+a real HTTP `200`, secrets travel only by reference, and plan numbers come
+from the live API. Examples are written as CLI commands; through MCP, call the
+tool that does the same thing.
+
+### Remote MCP (preferred)
+
+If your tool list already has tools from the `innstance` MCP server, use them
+and install nothing. Read each tool's name, description and input schema from
+the server's own tool list; do not rely on tool names remembered from
+elsewhere, including this file.
+
+To connect a client by hand:
+
+- URL: `https://innstance.impossibuild.ai/mcp`, over Streamable HTTP. It lives
+  on the control plane. An MCP server under any `innstance.app` address is a
+  customer's app, not Innstance.
+- Server name: `innstance`.
+- Sign-in: an Innstance API token sent as a bearer token. The user creates it
+  on the dashboard's API tokens page, with an expiry, and keeps it in an
+  environment variable such as `INNSTANCE_TOKEN` that the client reads. Never
+  ask for the token in chat, and never put it in a command argument or a
+  tracked file.
+
+Claude Code reads a project `.mcp.json` and expands environment variables in
+it, so the file holds the variable's name, never the token:
+
+```json
+{
+  "mcpServers": {
+    "innstance": {
+      "type": "http",
+      "url": "https://innstance.impossibuild.ai/mcp",
+      "headers": { "Authorization": "Bearer ${INNSTANCE_TOKEN}" }
+    }
+  }
+}
+```
+
+Codex reads `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.innstance]
+url = "https://innstance.impossibuild.ai/mcp"
+bearer_token_env_var = "INNSTANCE_TOKEN"
+```
+
+Other clients need the same three facts: the URL, Streamable HTTP, and a
+bearer token taken from an environment variable.
+
+The MCP server is rolling out. If the endpoint answers `404` or the client
+cannot connect, it is not available to this account yet: use the CLI for this
+session and tell the user. Do not retry in a loop.
+
+### `npx innstance`
+
+```bash
+npx innstance
+```
+
+The package is pure JavaScript and downloads no native binary. It signs in
+with the same browser approval as `innstance login` (it prints a code and the
+user approves it on any device), adds the `innstance` MCP server to the coding
+tools it finds on this machine, and installs this skill. Tell the user a
+browser approval is coming before you run it; the sign-in cannot finish
+without them.
+
+Run it only when npm shows the package was built from the Innstance source
+repository, with a provenance attestation:
+
+```bash
+npm view innstance repository.url dist.attestations.provenance.predicateType
+```
+
+`repository.url` must name `github.com/ImpossibleFinance/impossible-hosting-cli`,
+and the provenance line must be present. If either is missing, do not run it.
+If npm reports that the package does not exist, it is not published yet: set
+up MCP by hand or use the CLI. Never run a similarly named package.
+
+### The `innstance` CLI (power users)
+
+The Go CLI covers every command in this file. Use it for scripts and CI, for
+users who prefer a terminal, and for any step the MCP tool list does not
+offer.
 
 The command used to be called `ifhost`. That name still works and runs the same binary, but new installs use `innstance`, and the served installer leaves `ifhost` beside it as a link.
 
@@ -212,11 +305,20 @@ try {
 When `innstance` already exists, skip the bootstrap and run `innstance version`
 followed by `innstance skill sync`.
 
-`skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
+## Agent Rules
+
+### 0. Refresh these instructions first, every session
+
+With the CLI, run `innstance version` and then `innstance skill sync` before
+anything else. `skill sync` prints the authoritative cached `SKILL.md` and `RUNBOOK.md`
 paths. If this file was loaded from another path, read those refreshed files
 now and continue from them. If the sync fails (network, outage), keep working
 from the copy you already have and mention the failed refresh to the user — a
 slightly stale bundle is safe; guessed instructions are not.
+
+Through MCP or `npx innstance` alone there is no CLI to sync. When this copy
+may be out of date, read the current guide at
+`https://innstance.impossibuild.ai/skills` and continue from it.
 
 Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 `innstance update` remains available for an explicit update.
@@ -229,9 +331,10 @@ In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, wi
 
 ### 0b. Deploy ≠ live — never declare success without a 200
 
-`innstance deploy` succeeding means the VM is provisioned, NOTHING more. The
-VM boots as a bare shell with no app process; the CLI prints "Runner VM
-ready." and then "Your app is NOT live yet". You are done only when ALL of:
+`innstance deploy` succeeding means the VM is provisioned, NOTHING more, and
+the same holds for a deploy through MCP. The VM boots as a bare shell with no
+app process; the CLI prints "Runner VM ready." and then "Your app is NOT live
+yet". You are done only when ALL of:
 
 1. You installed and STARTED the app (survives the exec session:
    `innstance machines exec --app X -- sh -c "setsid nohup <cmd> </dev/null > /tmp/app.log 2>&1 &"`)
@@ -454,8 +557,8 @@ flags. Do not infer runner lifecycle from generic examples in help output:
 
 ## Install / Update
 
-When `innstance` is missing, use the signed-channel bootstrap in Rule 0 exactly as
-written. Do not substitute either release-origin installer, another public
+When `innstance` is missing, use the signed-channel bootstrap under *The
+`innstance` CLI* exactly as written. Do not substitute either release-origin installer, another public
 key, an unsigned archive, or a checksum that is not authenticated by the
 SSHSIG release record.
 
@@ -467,8 +570,8 @@ innstance version
 innstance skill sync
 ```
 
-On macOS/Linux, add `~/.local/bin` to PATH if needed. On Windows, the Rule 0
-PowerShell block adds `%LOCALAPPDATA%\innstance` to the current process PATH; add
+On macOS/Linux, add `~/.local/bin` to PATH if needed. On Windows, the
+PowerShell bootstrap adds `%LOCALAPPDATA%\innstance` to the current process PATH; add
 that directory to the user PATH for future terminals. If OpenSSH Client is
 missing, run `Add-WindowsCapability -Online -Name
 OpenSSH.Client~~~~0.0.1.0` in an elevated PowerShell, then repeat the verified
@@ -481,7 +584,7 @@ innstance --help
 ```
 
 If any signature or digest check fails, stop without installing. Do not bypass
-the Rule 0 trust anchor or use a direct archive pipe.
+the bootstrap's trust anchor or use a direct archive pipe.
 
 ## Quick Start
 

@@ -1,24 +1,46 @@
 # Innstance Deployment Skill
 
-A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code) that teaches AI agents how to deploy apps using [Innstance](https://innstance.impossibuild.ai).
+Agent instructions for [Innstance](https://innstance.impossibuild.ai): publish
+a page or files, deploy an app to a runner VM, connect a custom domain, or run
+a hosted assistant, then verify that it is really live.
 
-## Usage
+## Start here: MCP or npx
 
-Add to your Claude Code project's `.claude/settings.json`:
+The main way in needs nothing of ours installed:
 
-```json
-{
-  "skills": ["ImpossibleFinance/impossible-hosting-skill"]
-}
+- **Remote MCP server**: `https://innstance.impossibuild.ai/mcp`, over
+  Streamable HTTP, server name `innstance`. The client sends an Innstance API
+  token as a bearer token, read from an environment variable such as
+  `INNSTANCE_TOKEN`; the token never goes in chat, a command argument or a
+  tracked file. Client examples are in [SKILL.md](SKILL.md#remote-mcp-preferred).
+- **`npx innstance`**: signs in through the browser, adds the MCP server to the
+  coding tools it finds, and installs this skill. It needs Node.js 18 or newer
+  and downloads no native binary. Check its provenance before the first run,
+  as [SKILL.md](SKILL.md#npx-innstance) describes.
+
+Both are rolling out. If the MCP endpoint answers `404`, or npm reports that
+the package does not exist, use the CLI below for now.
+
+## Install the skill by hand
+
+Claude Code loads personal skills from `~/.claude/skills/<name>/SKILL.md`:
+
+```bash
+git clone https://github.com/ImpossibleFinance/impossible-hosting-skill ~/.claude/skills/innstance
 ```
 
-Or reference directly in a prompt:
+Any agent can also read the current guide at
+`https://innstance.impossibuild.ai/skills`, or be told:
 
 ```
 Use the innstance skill to deploy this project.
 ```
 
-## Install the CLI from the signed release channel
+## Power users: install the CLI from the signed release channel
+
+The Go CLI covers every command the skill describes. Use it for scripts and
+CI, for users who prefer a terminal, and for any step the MCP tool list does
+not offer.
 
 <!-- BEGIN VERIFIED CLI BOOTSTRAP -->
 When `innstance` is missing, do not execute either installer served by the release
@@ -231,16 +253,32 @@ PATH to make `innstance` available in future terminals.
 
 ## What the agent learns
 
+- Which way in to use: the remote MCP server, `npx innstance`, or the CLI
 - How to install and authenticate with Innstance
+- How to publish pages and files, and claim a name early (`innstance publish`, `innstance sites lock`)
 - How to configure machine specs (`innstance init`)
 - How to deploy (`innstance deploy`)
 - Common patterns (static sites, APIs, heavy apps, interactive setup)
 - Non-blocking log monitoring via tmux console
 - Traps to avoid (port mismatch, OOM, autostop, env vars)
 - Post-deploy management (logs, exec, console, apply, destroy)
+- Custom domains for apps and published sites
+- Hosted assistants (`innstance agents`): spawn, link a chat app, back up, remove
 - Full command reference with flags and examples
 
 ## Example agent interaction
+
+Through the MCP server:
+
+```
+User: Put this page live as my-page
+
+Agent: I'll publish it with the innstance MCP server.
+       [calls the server's publish tool with index.html and the name my-page]
+       It answered https://my-page.innstance.app, and that URL returned HTTP 200.
+```
+
+Through the CLI:
 
 ```
 User: Deploy this Node.js app
@@ -259,8 +297,10 @@ Agent: The app returned HTTP 200 at its assigned public URL.
 
 ## Links
 
+- MCP endpoint: `https://innstance.impossibuild.ai/mcp`
 - [CLI source](https://github.com/ImpossibleFinance/impossible-hosting)
 - [Repository release trust anchor](./release-signers)
 - [Runner deployment runbook](./RUNBOOK.md)
+- [Security policy](./SECURITY.md)
 - [Docs](https://innstance.impossibuild.ai/docs)
-- [llm.txt](https://innstance.impossibuild.ai/llm.txt)
+- [llms.txt](https://innstance.impossibuild.ai/llms.txt)
