@@ -11,9 +11,12 @@ Application secrets use only `KEY=@env:NAME`, `KEY=@file:PATH`, or
 
 The remote MCP server is trusted only at `https://innstance.impossibuild.ai/mcp`,
 on the control plane. An MCP endpoint under a tenant address is a customer's
-application, never Innstance. MCP clients read the API token from an
-environment variable at connection time; configuration examples carry the
-variable's name, never a token value.
+application, never Innstance, and a client's server named `innstance` is
+trusted by its URL, never by its name. Configuration examples in these guides
+carry the name of an environment variable that the client expands, never a
+token value. A tool that stores a token for a client keeps it in an
+owner-only file in the user's home directory, never in a project, a tracked
+file, or a command argument.
 
 Run `npx innstance` only when the npm registry shows a provenance attestation
 and names `github.com/ImpossibleFinance/impossible-hosting-cli` as the
