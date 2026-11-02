@@ -810,7 +810,7 @@ innstance init --app <name> --port <port> --memory <mb> [flags]
 | `--port` | 8080 | Port the app listens on |
 | `--memory` | 256 | RAM in MB, rounded up to the next supported size (256, 512, 1024, 2048, 4096, 8192) |
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
-| `--cpu-kind` | shared | `shared` or `performance`. Performance is not on every plan; `innstance billing plans` shows which |
+| `--cpu-kind` | shared | `shared` or `performance`. Performance is not on every plan (`innstance init --help` says Pro and above); `innstance billing plans --json` shows each plan's `limits.cpu_kind` |
 | `--cmd` | (none) | DEPRECATED — writes `[build] cmd`, which deploys ignore. Start apps via `machines exec` instead |
 | `--autostop` | false | Always-on is the platform default: apps do not scale to zero unless you opt in. `true` stops the VM when idle, and a runner app does NOT survive that (the VM wakes with no app process), so set it only for an app the user accepts going dark when idle |
 | `--min-machines` | 0 | With the always-on default this rarely needs setting; pairs with explicit autostop |
@@ -1288,7 +1288,7 @@ installed.
 
 ```bash
 innstance billing status                     # Current subscription status
-innstance billing subscribe hobby            # Subscribe to a plan (hobby, pro, team; team is shown as Studio)
+innstance billing subscribe hobby            # Subscribe to a plan (hobby, pro, team)
 innstance billing subscribe --plan pro --pay crypto   # Specify payment method
 innstance billing cancel                     # Cancel subscription
 innstance billing cancel-change              # Call off a queued plan change, keep the current plan
@@ -1342,6 +1342,9 @@ live at `/dashboard/app` under the plan card.
 payments are unavailable for now, as the command's help says; crypto (USDC)
 works today. Do not promise a date for cards. `--pay crypto` is a
 compatibility spelling that still lands on the same hosted checkout.
+
+The plan names the CLI and API take are `hobby`, `pro` and `team`. If the user
+mentions a Studio plan, that is the one the CLI calls `team`.
 
 Already subscribed? The same `innstance billing subscribe <plan>` switches
 plans in place: an upgrade applies immediately and charges the saved
