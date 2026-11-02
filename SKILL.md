@@ -223,9 +223,9 @@ Set `IFHOST_AUTO_UPDATE=0` only when the user explicitly needs a pinned CLI.
 
 ### Public URLs
 
-Use the exact public URL returned by `innstance deploy`, `innstance publish`, `innstance sites lock`, or the resource listing. New apps, static sites, and agent panels get an address built from their name, `https://<name>.innstance.app`, and the name check states it before anything is uploaded (`GET /sites/check-name?name=` returns `url`). Names are global across every account: a name the public namespace refuses is reported as taken (`NAME_TAKEN`) and the claim is released, so pick another. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. Addresses handed out earlier under another domain, including the retired `*.host.impossibuild.ai`, redirect to the same name on `innstance.app`. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
+Use the exact public URL returned by `innstance deploy`, `innstance publish`, `innstance sites lock`, or the resource listing. New apps, static sites, and assistant panels get an address built from their name, `https://<name>.innstance.app`, and the name check states it before anything is uploaded (`GET /sites/check-name?name=` returns `url`). Names are global across every account: a name the public namespace refuses is reported as taken (`NAME_TAKEN`) and the claim is released, so pick another. Existing shared-host URLs and connected custom domains remain valid: do not migrate or rewrite them. Addresses handed out earlier under another domain, including the retired `*.host.impossibuild.ai`, redirect to the same name on `innstance.app`. The control API and CLI downloads remain at `https://innstance.impossibuild.ai`.
 
-In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Read it from the command's output rather than composing it, so an older resource on a shared-host URL is not mistaken for a new one. Agent compute stays on AWS behind its public gateway.
+In verification examples below, set `IFHOST_PUBLIC_URL` to that returned URL, without a trailing slash. Read it from the command's output rather than composing it, so an older resource on a shared-host URL is not mistaken for a new one. Hosted assistants run on AWS behind the platform's public gateway.
 
 ### 0b. Deploy ≠ live — never declare success without a 200
 
@@ -1281,10 +1281,15 @@ innstance machines console input --app my-project $SID "git clone ... /data/app 
 
 ---
 
-## Ready-made agents (`innstance agents`)
+## Hosted assistants (`innstance agents`)
 
-Separate from deploying your own code, Innstance hosts **ready-made AI agents**
-from a catalog. One of these is not an app you write: it is an agent that
+Separate from deploying your own code, Innstance hosts **ready-made AI
+assistants** from a catalog. The CLI and API still call them agents: the
+commands are `innstance agents ...`, and JSON fields and error codes keep
+`agent` in their names. This file says "assistant" in prose because "agent"
+already means you, the coding agent reading it.
+
+One of these is not an app you write: it is an assistant that
 gets its own machine, its own storage and its own control panel, and talks
 to its owner in a chat app — Telegram, Discord, and on hermes also
 WhatsApp; each recipe names its own channels. You spawn it and
@@ -1301,7 +1306,7 @@ innstance agents list            # names, one line each
 innstance agents list --json     # THE source of truth for every flag name below
 ```
 
-`--json` is what you read before spawning. It carries, per agent:
+`--json` is what you read before spawning. It carries, per assistant:
 
 - `selections[].id` and each `options[].id` — the values for `--choose`
 - `inputs[].key` — the values for `--set` / `--set-from-env`
@@ -1314,14 +1319,14 @@ page is not.
 
 ### Names are global, and two refusals mean different things
 
-An agent's name is its permanent address and is unique across the whole
+An assistant's name is its permanent address and is unique across the whole
 platform, so `spawn` can refuse for two opposite reasons:
 
 - `agent_name_yours` — you already have one by that name. Spawning again
   resumes that setup where it stopped; the refusal says what state it is in.
   Remove it instead with `innstance agents destroy <name> --yes-irreversible`.
-- `agent_name_taken` — the name is not available for an agent. A page, an app
-  and an agent each answer at `<name>.<our domain>`, so all three draw from one
+- `agent_name_taken` — the name is not available for an assistant. A page, an
+  app and an assistant each answer at `<name>.<our domain>`, so all three draw from one
   set of names: the holder may be another account, or one of THIS account's own
   pages or apps. Run `innstance status`, which lists both, before telling the user
   a stranger has it. Remove yours, or pick a different name.
@@ -1369,7 +1374,7 @@ innstance agents spawn hermes --name my-assistant \
   is visible to every process on the machine and lands in shell history.
 - `--set KEY=value` supplies a value directly. Fine for non-secrets like a
   model name.
-- `--extra KEY=value` sets an optional integration variable, when the agent
+- `--extra KEY=value` sets an optional integration variable, when the assistant
   offers an extras section. It needs a submission to ride along with, so use
   it alongside the answers above (or with `--type-here`); on the default
   browser path the owner sets extras in the form and the flag is refused
@@ -1389,8 +1394,8 @@ needs a real TTY and is for humans who prefer typing; do not use it.
 
 ### Linking WhatsApp
 
-Only for agents whose recipe offers the WhatsApp channel — today hermes and
-openclaw. An agent spawned without it has nothing to link, and the API says
+Only for assistants whose recipe offers the WhatsApp channel — today hermes and
+openclaw. An assistant spawned without it has nothing to link, and the API says
 so plainly rather than pretending a code is coming.
 
 WhatsApp carries no key to paste — the owner links an account they already
@@ -1398,7 +1403,7 @@ have by scanning a code with their phone. That step needs a human with a
 phone, but everything around it works from the terminal:
 
 ```bash
-innstance agents whatsapp pair my-assistant     # prints a scannable QR, waits, switches the agent on
+innstance agents whatsapp pair my-assistant     # prints a scannable QR, waits, switches the assistant on
 ```
 
 Codes expire every few seconds; the command draws fresh ones and starts a
@@ -1413,14 +1418,14 @@ replaced underneath, so an unchanged code proves nothing on its own.
 If the command reaches its deadline it says no scan landed and names both
 possibilities, because they cannot be told apart from outside: either nobody
 scanned, or a scan did land and the session had already gone. If the owner says
-they DID scan, restart the agent with `innstance agents reconfigure <name>` — which
+they DID scan, restart the assistant with `innstance agents reconfigure <name>` — which
 keeps everything it remembers — and run the pair command again. Do NOT destroy
-and respawn the agent for this, and do not report the spawn as failed.
+and respawn the assistant for this, and do not report the spawn as failed.
 
-Until a scan lands, a WhatsApp agent is up but not listening. That is not a
+Until a scan lands, a WhatsApp assistant is up but not listening. That is not a
 failure: `spawn` completes, status reaches `running`, and the verify result
 says "WhatsApp isn't linked yet" as a warning. You can scan later, scan a
-different number, or move the agent to another channel with `reconfigure`,
+different number, or move the assistant to another channel with `reconfigure`,
 and it keeps everything it remembers either way.
 
 What "up but not listening" means differs by recipe, and neither is a fault
@@ -1428,18 +1433,18 @@ to chase. Hermes keeps its gateway DOWN while WhatsApp is selected and
 unpaired, so the scan is what starts it. OpenClaw runs normally with the
 channel switched on and simply unlinked, and it answers nobody until the
 scan says who its owner is — its allowlist is deliberately empty until then,
-so an agent nobody has scanned is an agent nobody can talk to.
+so an assistant nobody has scanned is one nobody can talk to.
 
 ### After it is spawned
 
 ```bash
-innstance agents status                    # all your agents
-innstance agents status my-assistant       # one agent, with its verify result
+innstance agents status                    # all your assistants
+innstance agents status my-assistant       # one assistant, with its verify result
 innstance agents logs my-assistant         # its recent log, credentials redacted
 innstance agents logs my-assistant --lines 500
 ```
 
-**One line in that log looks like a break and is not.** Shortly after an agent
+**One line in that log looks like a break and is not.** Shortly after an assistant
 starts you will see:
 
 ```
@@ -1447,7 +1452,7 @@ starts you will see:
 [ws] closed before connect ... code=1008 reason=unauthorized: gateway password mismatch
 ```
 
-That is the platform's own checkup trying a WRONG password against the agent's
+That is the platform's own checkup trying a WRONG password against the assistant's
 control panel and requiring it to be refused. The panel faces the internet and
 its sign-in is the only thing guarding it, so the check proves the door is shut
 by walking into it. A successful `health` line a few seconds earlier is the same
@@ -1455,7 +1460,7 @@ checkup getting in with the RIGHT password — seeing both, in that order, means
 the panel is working correctly.
 
 Do not report this as a fault, do not tell the owner to reset anything, and do
-not rebuild the agent over it.
+not rebuild the assistant over it.
 
 ```bash
 innstance agents reconfigure my-assistant  # change model, keys or channel
@@ -1465,8 +1470,8 @@ innstance agents pull my-assistant              # download its memory as a backu
 innstance agents destroy my-assistant --yes-irreversible
 ```
 
-`agents pull` archives the agent's state (memory, conversations,
-workspace) LIVE — the agent keeps running — and downloads it as a
+`agents pull` archives the assistant's state (memory, conversations,
+workspace) LIVE — the assistant keeps running — and downloads it as a
 tar.gz, SHA-256 verified. The download is METERED as outbound traffic,
 exactly like `machines pull`: the exact size and the account's traffic
 standing print first, nothing is downloaded or metered until approved,
@@ -1474,9 +1479,9 @@ and `--yes-egress` is the explicit non-interactive consent. Key material
 is left out by the recipe, so the archive is safe to store; restoring
 elsewhere means re-entering provider keys and re-pairing channels. Pull
 a backup BEFORE `agents destroy` — destroy deletes the machine and
-everything the agent remembers.
+everything the assistant remembers.
 
-### A shell on the agent's machine
+### A shell on the assistant's machine
 
 ```bash
 innstance agents ssh my-assistant                      # interactive shell
@@ -1490,12 +1495,12 @@ innstance agents exec my-assistant --in-agent -- openclaw config get agents.defa
 
 `agents exec` is the shape for you: no ssh client, no key, no terminal — the
 command goes over the platform's own channel, runs as root on the machine
-(`--in-agent`: inside the agent's container), and its output and exit
+(`--in-agent`: inside the assistant's container), and its output and exit
 status come back. Captured output is limited to about 24 KB and one run
 to ten minutes (`--timeout`, default 120 s); start anything longer
 detached and poll, or use `agents ssh`, which streams without limit.
 
-### An OpenClaw agent that thinks through Claude Code (`claude -p`)
+### An OpenClaw assistant that thinks through Claude Code (`claude -p`)
 
 OpenClaw can use Claude Code itself as its brain, signed in with the
 owner's Claude subscription — nothing billed separately. It is a choice
@@ -1512,11 +1517,11 @@ innstance agents spawn openclaw --name my-claw \
   --set-from-env CLAUDE_CODE_OAUTH_TOKEN
 ```
 
-The recipe installs Claude Code into the agent's own storage on first boot
-(so it survives every restart and reconfigure), points the agent at the
+The recipe installs Claude Code into the assistant's own storage on first boot
+(so it survives every restart and reconfigure), points the assistant at the
 `claude-cli` runtime for `anthropic/<model>`, and the token travels in the
-agent's environment like any other key. The verify checkup then asks the
-agent a real question through it. The token is the owner's — treat it as
+assistant's environment like any other key. The verify checkup then asks the
+assistant a real question through it. The token is the owner's — treat it as
 you treat their password: it comes from their machine, and it is never
 something you mint or type for them.
 
@@ -1526,38 +1531,38 @@ machine listens for it: your public key (made once, in `~/.impossible/ssh/`)
 is accepted for sixty seconds per connection and the connection rides a
 tunnel the platform opens, so there is no port to find, no key on the
 machine to rotate, and the session is encrypted end to end by ssh. The
-agent itself runs in a container called `agent`; `docker exec -it agent sh`
+assistant itself runs in a container called `agent`; `docker exec -it agent sh`
 gets inside it, and its state lives on the machine under `/state`.
 
-Needs the agent to be `running`, and an `ssh` binary where the CLI runs.
+Needs the assistant to be `running`, and an `ssh` binary where the CLI runs.
 Whatever you change on the machine by hand is yours: the next
 `reconfigure` rewrites the environment file and replaces the container,
 and the verify checkup still reports on the result.
 
 Spawn is not finished when the machine boots. The platform runs the recipe's
-own verify probe — it asks the agent a real question and waits for a real
+own verify probe — it asks the assistant a real question and waits for a real
 answer — and only then reports `running`. `spawn` already waits for that, so
-its success means the agent genuinely replied, not merely that a machine
+its success means the assistant genuinely replied, not merely that a machine
 exists. The probe can also check the messaging gateway and public control
 panel. `verify-failed` means a verification check failed; it does not identify
 the cause. Read the report printed by spawn, or run `innstance agents status <name>`,
-before changing credentials or restarting the agent. Follow the failed check's
+before changing credentials or restarting the assistant. Follow the failed check's
 recovery instructions.
 
 ### Traps
 
 | Trap | What happens | What to do |
 |------|--------------|------------|
-| Spawning WhatsApp unattended | Setup completes, but the agent cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `innstance agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
-| The agent is slow, or answered nothing | You cannot tell whether it is thinking, stuck, or never received the message | `innstance agents logs <agent>` reads its recent log with anything credential-shaped redacted. Measured 2026-08-20 on a healthy agent: a chat message through the control panel came back in ~3.5s, while the SAME agent on Telegram took 11-19s, and one message in five got no reply at all. So slowness on a messaging channel is not evidence of a broken agent, and "it never replied" is a real thing that happens — check the log before rebuilding anything. |
-| Asking for the panel password | You cannot read it, and you should not | The control panel's sign-in is provisioned automatically and only its owner sees it, once. The owner presses "Reveal password" on the agent's row in the dashboard, or runs `innstance agents panel <name> --show-password`, which saves it to an owner-only file (`<name>-dashboard-password.txt`) in the current directory and prints only the file name. If you ran that command, tell the owner where the file is and do not open, print or copy it yourself. The reveal works once: after that the password is changed from the agent's own control panel. No `innstance` command resets it or prints it. |
-| The panel refuses the first browser | "pairing required: device is not approved yet" | Only for agents whose panel asks each device for approval — `innstance agents status <agent>` says which those are, and most recipes do not. For those that do, this is expected exactly once: the approval cannot exist until a browser has knocked, so the first load is refused and the agent admits it a moment later. Wait a couple of seconds and reload. A second computer or phone needs `innstance agents panel <agent> --approve`. On a panel that does NOT ask for device approval, a refusal or a blank page is a real fault — do not wait it out. |
-| Hunting for openclaw's panel username | There is one password field and no username anywhere | That agent's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner reveals the password once, from the dashboard or with `--show-password`. |
-| Spawn sits on "installing" for minutes | Nothing is wrong: that step fetches and starts the agent, and it is the longest part of a spawn | Wait it out. The step after it ("checking your keys") is short. A spawn that has genuinely stalled stops moving between steps, and the dashboard says so rather than sitting on one. |
-| One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy agent's model unknown. |
-| Picking openclaw's model from a live list | The agent boots, then refuses every message with "Unknown model" | Model names resolve through the agent's own gateway. `openclaw models list --provider <id>` inside the agent shows what it accepts right now; a newer name from a provider's public list may not be there yet. |
-| Guessing model names | The agent boots and then refuses every message | A model name is written verbatim into the agent's config. Use a name the provider really serves, from `innstance agents list --json`. |
-| Assuming a free spawn is permanent | The agent disappears | An agent successfully spawned on Free carries a destruction timestamp. `spawn` prints the server's current destruction notice before setup starts — relay that notice. If the exact time matters, run `innstance agents status <name> --json` and read `expires_at`; never copy a duration into this skill. |
+| Spawning WhatsApp unattended | Setup completes, but the assistant cannot hear anyone | WhatsApp is linked by scanning a code with a phone, so it cannot be finished headlessly. Everything around the scan does work from the terminal: `innstance agents whatsapp pair <name>` draws the code and waits. A human with the phone still has to scan it. |
+| The assistant is slow, or answered nothing | You cannot tell whether it is thinking, stuck, or never received the message | `innstance agents logs <name>` reads its recent log with anything credential-shaped redacted. Measured 2026-08-20 on a healthy assistant: a chat message through the control panel came back in ~3.5s, while the SAME assistant on Telegram took 11-19s, and one message in five got no reply at all. So slowness on a messaging channel is not evidence of a broken assistant, and "it never replied" is a real thing that happens — check the log before rebuilding anything. |
+| Asking for the panel password | You cannot read it, and you should not | The control panel's sign-in is provisioned automatically and only its owner sees it, once. The owner presses "Reveal password" on the assistant's row in the dashboard, or runs `innstance agents panel <name> --show-password`, which saves it to an owner-only file (`<name>-dashboard-password.txt`) in the current directory and prints only the file name. If you ran that command, tell the owner where the file is and do not open, print or copy it yourself. The reveal works once: after that the password is changed from the assistant's own control panel. No `innstance` command resets it or prints it. |
+| The panel refuses the first browser | "pairing required: device is not approved yet" | Only for assistants whose panel asks each device for approval — `innstance agents status <name>` says which those are, and most recipes do not. For those that do, this is expected exactly once: the approval cannot exist until a browser has knocked, so the first load is refused and the assistant admits it a moment later. Wait a couple of seconds and reload. A second computer or phone needs `innstance agents panel <name> --approve`. On a panel that does NOT ask for device approval, a refusal or a blank page is a real fault — do not wait it out. |
+| Hunting for openclaw's panel username | There is one password field and no username anywhere | That assistant's sign-in is a password alone — the dashboard and CLI both say so. Same flow otherwise: the owner reveals the password once, from the dashboard or with `--show-password`. |
+| Spawn sits on "installing" for minutes | Nothing is wrong: that step fetches and starts the assistant, and it is the longest part of a spawn | Wait it out. The step after it ("checking your keys") is short. A spawn that has genuinely stalled stops moving between steps, and the dashboard says so rather than sitting on one. |
+| One-shot question to openclaw over exec | `openclaw agent exec` refuses or hangs on a state lock | The running gateway owns the real state dir exclusively. Omit `--state-dir` (isolated temp state) — or for a pure "can it think" check, `openclaw infer model run --gateway --prompt "..."`. Never `--local`: the embedded path can't see models the gateway discovered and calls a healthy assistant's model unknown. |
+| Picking openclaw's model from a live list | The assistant boots, then refuses every message with "Unknown model" | Model names resolve through the assistant's own gateway. `openclaw models list --provider <id>` inside the assistant shows what it accepts right now; a newer name from a provider's public list may not be there yet. |
+| Guessing model names | The assistant boots and then refuses every message | A model name is written verbatim into the assistant's config. Use a name the provider really serves, from `innstance agents list --json`. |
+| Assuming a free spawn is permanent | The assistant disappears | An assistant successfully spawned on Free carries a destruction timestamp. `spawn` prints the server's current destruction notice before setup starts — relay that notice. If the exact time matters, run `innstance agents status <name> --json` and read `expires_at`; never copy a duration into this skill. |
 | Supplying two providers | The API rejects the whole submission | Answer the provider question once and supply only that provider's key. |
 
 ---
@@ -1566,7 +1571,7 @@ recovery instructions.
 
 **First fork: is the user asking for an app, or for an assistant?** A
 website, API or bot they wrote is `innstance deploy`, below. "An AI I can
-message" is a catalog agent — see *Ready-made agents* above, and do not
+message" is a hosted assistant — see *Hosted assistants* above, and do not
 build one by hand.
 
 ```
