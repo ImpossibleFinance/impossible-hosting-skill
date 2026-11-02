@@ -14,7 +14,36 @@ A deployment is complete only when:
 4. Any user-requested representative routes also return their expected
    status and content type.
 
-`innstance deploy` provisioning a VM is not evidence that the app is live.
+`innstance deploy` provisioning a VM is not evidence that the app is live,
+and neither is a deploy through MCP.
+
+## Ways in
+
+The definition of done above is the same for all three. Pick in this order,
+before asking the user for a token or changing any file; `SKILL.md` gives the
+details under "Pick one, in this order".
+
+1. Tools from a server named `innstance` are already in your tool list: use
+   them only after checking that the server's URL is exactly
+   `https://innstance.impossibuild.ai/mcp`. Read tool names from the server's
+   own tool list. Where a step below names a CLI command, call the tool that
+   does the same thing.
+2. The `innstance` CLI is already installed and signed in: keep using it.
+3. Otherwise check once, with a deadline, whether the MCP endpoint answers
+   (only a `401`, `405` or `406` status) and whether npm has the package. When
+   both do, ask the user before running `npx innstance`, after checking its
+   provenance as `SKILL.md` describes under "`npx innstance`"; it signs in and
+   sets up the MCP server and the skill. When only the MCP endpoint answers,
+   connect it by hand as `SKILL.md` describes.
+4. In every other case, use the `innstance` CLI, the path for power users,
+   scripts and CI, and for any step the MCP tool list does not offer. Install
+   it with the verified bootstrap below.
+
+On Windows the native binary is optional: prefer MCP or `npx innstance` when
+they answer, and run the CLI inside WSL when WSL is set up. Otherwise the user
+chooses between installing WSL, which is their step, and the native
+`innstance.exe`. If an antivirus blocks `innstance.exe`, do not ask the user
+to override it; use WSL or MCP.
 
 ## Guardrails
 
@@ -107,7 +136,10 @@ innstance version
 innstance skill sync
 ```
 
-On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
+On Windows the native binary is optional. Prefer the MCP server or
+`npx innstance`; when you need the CLI, run the macOS/Linux block above
+inside WSL. Only when the user wants the native `innstance.exe`, run this in
+PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -525,7 +557,7 @@ internal log messages.
 | Symptom | Likely meaning | Action |
 |---|---|---|
 | `404 page not found` before creation | The app name is probably unassigned, but this is not an availability guarantee | Confirm by creating the app; handle `name already taken` explicitly |
-| `name already taken` | One name covers pages, apps and agents, so the holder may be any of the three, on any account including this one | Run `innstance status` (apps and pages) and `innstance agents list` first: if this account holds it, remove that or pick another name. Otherwise ask the user for a different name |
+| `name already taken` | One name covers pages, apps and assistants, so the holder may be any of the three, on any account including this one | Run `innstance status` (apps and pages) and `innstance agents status` first: if this account holds it, remove that or pick another name. Otherwise ask the user for a different name |
 | Deploy succeeds but URL fails | The runner exists but no app is listening | Install, transfer, start, and verify the process |
 | Persistent `502` | No listener, wrong port, loopback-only bind, or crashed process | Check the configured port, bind address, process, and recent logs |
 | Upload reports a rate-limit wait | The CLI exhausted the current request window | Let its bounded wait/resume finish; do not start a second manual retry loop |
