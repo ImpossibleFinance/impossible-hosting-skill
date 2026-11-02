@@ -47,16 +47,21 @@ Decide before you ask the user for a token or change any file:
    npm view innstance version --fetch-timeout=10000 --fetch-retries=0
    ```
 
+   In Windows PowerShell, type `curl.exe`: plain `curl` there is a different
+   command.
+
    `404` from the first means the MCP server is not available yet. Any other
-   status (`401` without a token, for example) means it is there. An `E404`
-   from npm means the package is not published yet.
+   `4xx` status (`401` without a token, for example) means it is there. A
+   `5xx` status, or no answer before the deadline, means it cannot be used
+   right now. An `E404` from npm means the package is not published yet.
 4. **Use what is there.** When both answer, `npx innstance` is the quickest
    start: it connects the MCP server for the user. When only the MCP server
    answers, connect it by hand as below; that needs the user to create a
-   token and usually to restart the client. When neither answers, or the
-   check itself fails, use the CLI: install it with the verified bootstrap
-   below. Do not ask the user for a token or edit a client's configuration for
-   a way in that is not there, and do not repeat the checks in a loop.
+   token and usually to restart the client. In every other case, including
+   when only npm answers or a check itself fails, use the CLI: install it with
+   the verified bootstrap below. Do not ask the user for a token or edit a
+   client's configuration for a way in that is not there, and do not repeat
+   the checks in a loop.
 
 ### Remote MCP (preferred)
 
@@ -130,14 +135,18 @@ changes other tools' configuration files, and the sign-in cannot finish
 without them at a browser.
 
 Check the package from an empty directory outside any project, so that `npx`
-cannot pick up an `innstance` command from a project's own `node_modules`
-instead of the registry, and then run exactly the version you checked:
+cannot pick up an `innstance` command from a project's own `node_modules`, or
+a registry from a project's `.npmrc`, instead of the public registry, and then
+run exactly the version you checked:
 
 ```bash
 cd "$(mktemp -d)"
 npm view innstance version repository.url dist.attestations.provenance.predicateType
 npx --yes innstance@<version>
 ```
+
+In PowerShell, create a new empty folder under `$env:TEMP` and `Set-Location`
+into it in place of the first line.
 
 Run it only when `repository.url` is exactly
 `git+https://github.com/ImpossibleFinance/impossible-hosting-cli.git` and the

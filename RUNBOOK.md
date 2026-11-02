@@ -30,12 +30,12 @@ details under "Pick one, in this order".
    does the same thing.
 2. The `innstance` CLI is already installed and signed in: keep using it.
 3. Otherwise check once, with a deadline, whether the MCP endpoint answers
-   (anything but `404`) and whether npm has the package. When both do, ask
-   the user before running `npx innstance`, after checking its provenance as
-   `SKILL.md` describes under "`npx innstance`"; it signs in and sets up the
-   MCP server and the skill. When only the MCP endpoint answers, connect it by
-   hand as `SKILL.md` describes.
-4. When neither answers, use the `innstance` CLI, the path for power users,
+   (a `4xx` status other than `404`) and whether npm has the package. When
+   both do, ask the user before running `npx innstance`, after checking its
+   provenance as `SKILL.md` describes under "`npx innstance`"; it signs in and
+   sets up the MCP server and the skill. When only the MCP endpoint answers,
+   connect it by hand as `SKILL.md` describes.
+4. In every other case, use the `innstance` CLI, the path for power users,
    scripts and CI, and for any step the MCP tool list does not offer. Install
    it with the verified bootstrap below.
 
