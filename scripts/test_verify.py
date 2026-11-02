@@ -135,6 +135,19 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
                     finally:
                         path.write_text(original, encoding="utf-8")
 
+    def test_idle_scaling_promises_are_rejected(self) -> None:
+        cases = (
+            ("scale-to-zero by default", "README.md",
+             "\nApps scale to zero by default, so an idle app costs nothing.\n"),
+            ("hyphenated scale-to-zero", "SKILL.md",
+             "\n- Infra: lightweight VMs with scale-to-zero.\n"),
+            ("sleeping when idle", "RUNBOOK.md",
+             "\nA new app sleeps when idle and wakes on the next request.\n"),
+        )
+        for label, name, snippet in cases:
+            with self.subTest(label):
+                self.assert_rejected_when_appended(name, snippet)
+
     def test_windows_bootstrap_without_wsl_is_rejected(self) -> None:
         # Changed identically in every guide, so only the WSL rule can object.
         for name in verify.BOOTSTRAP_DOCS:

@@ -754,7 +754,7 @@ innstance init --app <name> --port <port> --memory <mb> [flags]
 | `--cpus` | 1 | CPU count (1, 2, 4, 8) |
 | `--cpu-kind` | shared | `shared` or `performance`. Performance is not on every plan; `innstance billing plans` shows which |
 | `--cmd` | (none) | DEPRECATED — writes `[build] cmd`, which deploys ignore. Start apps via `machines exec` instead |
-| `--autostop` | false | Always-on is the platform default. Only set `true` for apps that may die on idle — runner apps do NOT survive an idle-stop (VM wakes with no app process) |
+| `--autostop` | false | Always-on is the platform default: apps do not scale to zero unless you opt in. `true` stops the VM when idle, and a runner app does NOT survive that (the VM wakes with no app process), so set it only for an app the user accepts going dark when idle |
 | `--min-machines` | 0 | With the always-on default this rarely needs setting; pairs with explicit autostop |
 | `--storage` | (empty) | `local` records an explicit local-storage request. An empty init value omits storage from the manifest, but runner deploys with no declared volumes currently still provision a 1 GB `/data` volume. Volumes are per-machine. |
 

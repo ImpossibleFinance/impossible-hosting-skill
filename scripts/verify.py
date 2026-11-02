@@ -39,6 +39,11 @@ NONEXISTENT_SPELLINGS = (
         "machines logs has no --follow; it streams by default until stopped",
     ),
 )
+# Apps are always-on unless the user opts into autostop, and a runner app does
+# not survive an idle stop. A line about scaling to zero or sleeping when idle
+# must say it is not the default; anything else reads as a promise.
+IDLE_PROMISE = re.compile(r"scal(?:e|es|ed|ing)[- ]to[- ]zero|sleeps?\s+when\s+idle", re.I)
+IDLE_QUALIFIER = re.compile(r"\b(?:not|never|no|unless|opt[- ]in)\b|n't\b", re.I)
 
 
 def fail(message: str) -> None:
@@ -237,6 +242,9 @@ def verify_docs(root: Path = ROOT) -> None:
             for pattern, reason in NONEXISTENT_SPELLINGS:
                 if pattern.search(line):
                     fail(f"{name}:{number}: {reason}")
+            if IDLE_PROMISE.search(line) and not IDLE_QUALIFIER.search(line):
+                fail(f"{name}:{number}: apps are always-on by default; never promise "
+                     "scale-to-zero or sleeping when idle")
             token_login = re.search(r"(?:innstance|ifhost)\s+login\s+--token(?:=|\s+)([^\s`|]+)", line)
             if token_login and token_login.group(1) != "-":
                 fail(f"{name}:{number}: token must come from stdin or --from-file")
