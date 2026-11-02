@@ -396,7 +396,7 @@ followed by `innstance skill sync`.
 
 With the CLI, run `innstance version` and then `innstance skill sync` before
 anything else. `skill sync` prints the skill version it installed and the paths
-of its cached `SKILL.md` and `RUNBOOK.md`. This copy is version `20261102-1`.
+of its cached `SKILL.md` and `RUNBOOK.md`. This copy is version `20261102-2`.
 Versions are `YYYYMMDD-N` and sort in that order. If this file was loaded from
 another path and the synced version is the same or newer, read those refreshed
 files now and continue from them. If the synced version is older, this CLI
@@ -474,6 +474,11 @@ authentication for a static page therefore needs a backend or authentication
 provider to issue it.
 
 ### 1. Understand the project BEFORE deploying
+
+A front-end that builds to static files is not a deploy: build it and
+`innstance publish` the folder the build writes (see "innstance publish and
+innstance sites"). The rest of this section is for something that runs a
+server process.
 
 **CRITICAL:** Before running `innstance init` or `innstance deploy`, complete this checklist:
 
@@ -1100,22 +1105,77 @@ TLS issuance is automatic after the required records are correct.
 
 ### innstance publish and innstance sites
 
-`publish` puts files on the web with no machine and no config: live in
-seconds at the tenant URL the command prints.
+`publish` puts a website or files on the web with no machine and no config:
+live in seconds at the tenant URL the command prints.
 
 ```bash
+innstance publish --name my-app ./dist             # a built website: the folder a build writes (index.html at its top)
+innstance publish --name my-app site.zip           # the same website as a .zip
 innstance publish --name my-page page.html         # one HTML file, served as the page
 innstance publish --name menu cover.pdf body.pdf   # PDFs combined into ONE document
 innstance publish --name gallery hero.png pic.jpg  # images stacked into one scrolling page
 innstance sites lock my-page                       # claim the name now, files later
 innstance sites list                               # name, URL, mode, size, updated
+innstance sites versions my-app                    # the versions kept, newest first, and which is live
+innstance sites rollback my-app                    # undo the last publish: the version it replaced is live again, instantly
+innstance sites rollback my-app --to <version>     # or any kept version, a newer one too
+innstance sites versions my-app --delete <version> # remove a replaced version from the server for good
 innstance sites rm my-page                         # delete a site
 ```
+
+A front-end that builds to static files (Vite, React, Vue, Svelte, Astro,
+Next.js with `output: 'export'`, Hugo, Jekyll, Docusaurus) is a static site:
+build it, then publish the folder the build writes. It needs no machine;
+`innstance deploy` is for something that runs a server process.
 
 File order is the order typed: PDF pages merge in that order, images stack
 top-to-bottom. Re-running `publish` with the same `--name` replaces the
 site's entire content — that is also how to rearrange. A single PDF or
 image is served directly at `/`.
+
+Website folders and .zip files:
+- Publish the build output, never the project root. The top of the folder
+  (or of the .zip; one wrapping folder such as `dist/` is unwrapped) must
+  hold `index.html`. The CLI refuses a folder with `package.json`, a
+  lockfile, `node_modules` or a bundler config (`vite.config.ts` and the
+  like) at its top, because its source and config files would be public;
+  `--include-source` publishes it anyway — only when the user confirms the
+  folder really is the finished site.
+- Addresses map to files: `/` → `index.html`, `/about` → `about.html` or
+  `about/index.html`. A top-level `404.html` answers a missing address.
+- Single-page apps: `--spa=auto` (the default) serves `index.html` for an
+  address with no file behind it when `index.html` is the only page, so
+  client-side routes load; `--spa=on` or `--spa=off` decides it yourself.
+- `_redirects` and `_headers` at the top are read as Netlify writes them,
+  for a safe subset (no proxying to other websites, no cookies, nothing that
+  weakens the platform's own headers). The publish still succeeds; every
+  line not applied is listed in the reply's notices. Tell the user about
+  each one.
+- Names starting with a dot (`.git`, `.env`, `.DS_Store`) are skipped.
+  Links, paths that leave the folder and files that are not web file types
+  are refused, and nothing is published.
+- Plans cap a site's size and its number of files; a site over them is
+  refused, naming the caps. Run `innstance billing` rather than quoting
+  numbers from memory.
+- If the reply says publishing a folder is not available on the server
+  yet, nothing was published: tell the user. Do not move the site onto a
+  machine without asking.
+
+Versions and rollback:
+- Every publish is kept as a version, and the reply names it
+  (`version`, `previous_version`). The server keeps the most recent few of
+  each site, always including the one the live version replaced.
+- `innstance sites rollback <name>` switches back to the version the live
+  one replaced; nothing is uploaded again, so it is instant. After any
+  publish, that is the undo.
+- A rollback can be refused: a version that was held for review, one
+  published on a paid plan when the account is now on Free, or one larger
+  than the plan allows. Publish the files again instead; they are checked
+  like any upload.
+- A replaced version is not served, but it stays on the server until later
+  publishes push it out. When the user republished to take something down
+  (a document, a page with a mistake), remove the old version with
+  `innstance sites versions <name> --delete <version>`.
 
 Rules that change what an agent should do:
 - Site names are GLOBAL across every account. First claim wins. `sites rm`
@@ -1132,8 +1192,9 @@ Rules that change what an agent should do:
   with `SETUP_LIMIT`: publish to a held name or `sites rm` one first.
 - `sites rm` asks interactively. Agents and scripts must pass `--yes`, or
   the command refuses and prints the flag instead of hanging on a prompt.
-- `publish` is one HTML file or PDFs/images, never both. A multi-file
-  website (HTML plus assets) is `innstance deploy` territory.
+- Loose files are one HTML file or PDFs/images, never both. A website of
+  several files (pages, scripts, styles) is published as one folder or
+  .zip, as above.
 - Site count and size limits are plan-dependent; run `innstance billing`
   rather than quoting numbers from memory.
 
