@@ -1281,7 +1281,8 @@ live at `/dashboard/app` under the plan card.
   `innstance status` to see which limit was hit before recommending a purchase.
 
 `subscribe` opens a hosted checkout page (pick card or crypto there). Card
-payments are coming soon; crypto (USDC) works today. `--pay crypto` is a
+payments are unavailable for now, as the command's help says; crypto (USDC)
+works today. Do not promise a date for cards. `--pay crypto` is a
 compatibility spelling that still lands on the same hosted checkout.
 
 Already subscribed? The same `innstance billing subscribe <plan>` switches
