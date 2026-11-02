@@ -30,7 +30,7 @@ details under "Pick one, in this order".
    does the same thing.
 2. The `innstance` CLI is already installed and signed in: keep using it.
 3. Otherwise check once, with a deadline, whether the MCP endpoint answers
-   (a `4xx` status other than `404`) and whether npm has the package. When
+   (only a `401`, `405` or `406` status) and whether npm has the package. When
    both do, ask the user before running `npx innstance`, after checking its
    provenance as `SKILL.md` describes under "`npx innstance`"; it signs in and
    sets up the MCP server and the skill. When only the MCP endpoint answers,

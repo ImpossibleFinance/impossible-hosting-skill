@@ -50,10 +50,12 @@ Decide before you ask the user for a token or change any file:
    In Windows PowerShell, type `curl.exe`: plain `curl` there is a different
    command.
 
-   `404` from the first means the MCP server is not available yet. Any other
-   `4xx` status (`401` without a token, for example) means it is there. A
-   `5xx` status, or no answer before the deadline, means it cannot be used
-   right now. An `E404` from npm means the package is not published yet.
+   Only `401`, `405` or `406` from the first means the MCP server is there:
+   those are what it answers a request without a token. `404` means it is not
+   available yet. Any other status, such as a `403` or `429` from a proxy,
+   firewall or rate limiter, a `5xx`, or no answer before the deadline, means
+   it cannot be used right now. An `E404` from npm means the package is not
+   published yet.
 4. **Use what is there.** When both answer, `npx innstance` is the quickest
    start: it connects the MCP server for the user. When only the MCP server
    answers, connect it by hand as below; that needs the user to create a
