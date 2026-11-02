@@ -135,6 +135,16 @@ class ReleaseBootstrapPolicyTest(unittest.TestCase):
                     finally:
                         path.write_text(original, encoding="utf-8")
 
+    def test_windows_bootstrap_without_wsl_is_rejected(self) -> None:
+        # Changed identically in every guide, so only the WSL rule can object.
+        for name in verify.BOOTSTRAP_DOCS:
+            self.replace(
+                name,
+                "run the macOS/Linux block above\ninside WSL.",
+                "run the macOS/Linux block above\non another machine.",
+            )
+        self.assert_rejected(verify.verify_docs)
+
     def test_public_bootstrap_drift_is_rejected(self) -> None:
         self.replace(
             "RUNBOOK.md",

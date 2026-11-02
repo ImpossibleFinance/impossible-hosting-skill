@@ -35,6 +35,10 @@ is the same for all three.
 If the MCP endpoint answers `404`, or npm reports that the package does not
 exist, that way in is not available yet: use the CLI and tell the user.
 
+On Windows the native binary is optional: prefer MCP or `npx innstance`, and
+run the CLI inside WSL when you need it. If an antivirus blocks
+`innstance.exe`, do not ask the user to override it; use WSL or MCP.
+
 ## Guardrails
 
 <!-- BEGIN VERIFIED CLI BOOTSTRAP -->
@@ -126,7 +130,10 @@ innstance version
 innstance skill sync
 ```
 
-On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
+On Windows the native binary is optional. Prefer the MCP server or
+`npx innstance`; when you need the CLI, run the macOS/Linux block above
+inside WSL. Only when the user wants the native `innstance.exe`, run this in
+PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
 $ErrorActionPreference = 'Stop'

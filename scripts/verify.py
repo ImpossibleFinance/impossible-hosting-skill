@@ -199,6 +199,11 @@ def verify_docs(root: Path = ROOT) -> None:
                         )
             if re.search(r"ssh-keygen -Y verify[\s\S]{0,200}\|\|\s*true", bootstrap):
                 fail(f"{name}: SSHSIG verification must not be bypassed")
+            # The native Windows binary is optional: Windows readers meet WSL
+            # before the PowerShell flow, never the executable as the only way.
+            wsl = bootstrap.find("inside WSL")
+            if wsl < 0 or wsl > bootstrap.find("```powershell"):
+                fail(f"{name}: offer the CLI inside WSL before the optional native Windows binary")
             if canonical_bootstrap is None:
                 canonical_bootstrap = bootstrap
             elif bootstrap != canonical_bootstrap:

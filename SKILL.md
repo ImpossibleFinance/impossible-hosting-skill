@@ -19,7 +19,7 @@ first one that works where you are running:
 |--------|-------|------------|
 | Remote MCP server, `https://innstance.impossibuild.ai/mcp` | An MCP client that speaks Streamable HTTP, and an Innstance API token | Everything its tool list offers, with nothing to install |
 | `npx innstance` | Node.js 18 or newer, and the user at a browser once | Signing in and setting up the MCP server and this skill in one step |
-| The `innstance` CLI | The signed native binary on macOS or Linux | Power users, scripts and CI, and any step the MCP tool list does not offer |
+| The `innstance` CLI | The signed native binary on macOS or Linux, or on Windows under WSL | Power users, scripts and CI, and any step the MCP tool list does not offer |
 
 The rules in this file hold whichever door you use: a deploy is not live until
 a real HTTP `200`, secrets travel only by reference, and plan numbers come
@@ -99,6 +99,23 @@ npm view innstance repository.url dist.attestations.provenance.predicateType
 and the provenance line must be present. If either is missing, do not run it.
 If npm reports that the package does not exist, it is not published yet: set
 up MCP by hand or use the CLI. Never run a similarly named package.
+
+### Windows
+
+The native Windows binary is optional:
+
+1. Prefer the remote MCP server or `npx innstance`. Neither puts an
+   executable from us on the machine.
+2. When you need the CLI, use WSL. In an administrator PowerShell run
+   `wsl --install`, restart if Windows asks, open the Linux shell, and run the
+   macOS/Linux bootstrap below inside it. The CLI's sign-in then lives in the
+   Linux home directory, separate from Windows.
+3. Only when the user asks for the native `innstance.exe`, use the PowerShell
+   bootstrap below.
+
+If Microsoft Defender or another antivirus blocks or quarantines
+`innstance.exe`, do not ask the user to allow it, restore it, or turn
+protection off. Switch to WSL or MCP, and tell the user what happened.
 
 ### The `innstance` CLI (power users)
 
@@ -197,7 +214,10 @@ innstance version
 innstance skill sync
 ```
 
-On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
+On Windows the native binary is optional. Prefer the MCP server or
+`npx innstance`; when you need the CLI, run the macOS/Linux block above
+inside WSL. Only when the user wants the native `innstance.exe`, run this in
+PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -570,8 +590,8 @@ innstance version
 innstance skill sync
 ```
 
-On macOS/Linux, add `~/.local/bin` to PATH if needed. On Windows, the
-PowerShell bootstrap adds `%LOCALAPPDATA%\innstance` to the current process PATH; add
+On macOS/Linux, and inside WSL, add `~/.local/bin` to PATH if needed. With the
+native Windows binary, the PowerShell bootstrap adds `%LOCALAPPDATA%\innstance` to the current process PATH; add
 that directory to the user PATH for future terminals. If OpenSSH Client is
 missing, run `Add-WindowsCapability -Online -Name
 OpenSSH.Client~~~~0.0.1.0` in an elevated PowerShell, then repeat the verified

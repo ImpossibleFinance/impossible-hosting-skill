@@ -21,6 +21,10 @@ The main way in needs nothing of ours installed:
 Both are rolling out. If the MCP endpoint answers `404`, or npm reports that
 the package does not exist, use the CLI below for now.
 
+On Windows, neither needs an executable from us. When the CLI is needed there,
+run the macOS/Linux bootstrap inside WSL; the native `innstance.exe` is
+optional.
+
 ## Install the skill by hand
 
 Claude Code loads personal skills from `~/.claude/skills/<name>/SKILL.md`:
@@ -131,7 +135,10 @@ innstance version
 innstance skill sync
 ```
 
-On Windows, run this in PowerShell with the OpenSSH Client capability enabled:
+On Windows the native binary is optional. Prefer the MCP server or
+`npx innstance`; when you need the CLI, run the macOS/Linux block above
+inside WSL. Only when the user wants the native `innstance.exe`, run this in
+PowerShell with the OpenSSH Client capability enabled:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -248,8 +255,8 @@ archive, a checksum downloaded without its signed release record, or a
 different public key.
 
 The bootstrap adds the install directory to the current process PATH. Add
-`~/.local/bin` (macOS/Linux) or `%LOCALAPPDATA%\innstance` (Windows) to the user
-PATH to make `innstance` available in future terminals.
+`~/.local/bin` (macOS, Linux and WSL) or `%LOCALAPPDATA%\innstance` (native
+Windows) to the user PATH to make `innstance` available in future terminals.
 
 ## What the agent learns
 
