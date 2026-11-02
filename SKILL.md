@@ -115,28 +115,35 @@ and tell the user. Do not retry in a loop.
 
 ### `npx innstance`
 
+Once it is published, `npx innstance` signs in with the same browser approval
+as `innstance login` (it prints a code and the user approves it on any
+device), adds the `innstance` MCP server to the coding tools it finds on this
+machine, and installs this skill. It keeps its sign-in in owner-only files in
+the user's home directory, never in a project.
+
+It runs Innstance's JavaScript package from npm with the user's own
+permissions. The package holds no native binary, so there is no executable for
+an antivirus to flag, but it is still code from us running on their machine,
+and what vouches for it is npm's provenance attestation, not the signed
+release record the CLI is checked against. Ask the user before you run it: it
+changes other tools' configuration files, and the sign-in cannot finish
+without them at a browser.
+
+Check the package from an empty directory outside any project, so that `npx`
+cannot pick up an `innstance` command from a project's own `node_modules`
+instead of the registry, and then run exactly the version you checked:
+
 ```bash
-npx innstance
+cd "$(mktemp -d)"
+npm view innstance version repository.url dist.attestations.provenance.predicateType
+npx --yes innstance@<version>
 ```
 
-The package is pure JavaScript and downloads no native binary. It signs in
-with the same browser approval as `innstance login` (it prints a code and the
-user approves it on any device), adds the `innstance` MCP server to the coding
-tools it finds on this machine, and installs this skill. Tell the user a
-browser approval is coming before you run it; the sign-in cannot finish
-without them.
-
-Run it only when npm shows the package was built from the Innstance source
-repository, with a provenance attestation:
-
-```bash
-npm view innstance repository.url dist.attestations.provenance.predicateType
-```
-
-`repository.url` must name `github.com/ImpossibleFinance/impossible-hosting-cli`,
-and the provenance line must be present. If either is missing, do not run it.
-If npm reports that the package does not exist, it is not published yet: set
-up MCP by hand or use the CLI. Never run a similarly named package.
+Run it only when `repository.url` is exactly
+`git+https://github.com/ImpossibleFinance/impossible-hosting-cli.git` and the
+provenance line is present, with `<version>` replaced by the version that same
+command printed. If npm reports that the package does not exist, it is not
+published yet: use another way in. Never run a similarly named package.
 
 ### Windows
 

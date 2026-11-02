@@ -18,10 +18,13 @@ token value. A tool that stores a token for a client keeps it in an
 owner-only file in the user's home directory, never in a project, a tracked
 file, or a command argument.
 
-Run `npx innstance` only when the npm registry shows a provenance attestation
-and names `github.com/ImpossibleFinance/impossible-hosting-cli` as the
-package's repository. A package without provenance, or one with a similar
-name, is not ours.
+Run `npx innstance` only with the user's agreement, from a directory outside
+any project, and only at a version whose npm registry entry shows a provenance
+attestation and whose `repository.url` is exactly
+`git+https://github.com/ImpossibleFinance/impossible-hosting-cli.git`. A
+package without provenance, or one with a similar name, is not ours. That
+check relies on npm and its provenance attestation, which is weaker than the
+SSHSIG release record that guards the CLI below.
 
 Fresh CLI installation trusts only the SSHSIG identity committed in
 [`release-signers`](release-signers). Never download or replace that trust
