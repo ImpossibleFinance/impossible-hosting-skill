@@ -19,25 +19,31 @@ and neither is a deploy through MCP.
 
 ## Ways in
 
-Use the first that works where you are running. The definition of done above
-is the same for all three.
+The definition of done above is the same for all three. Pick in this order,
+before asking the user for a token or changing any file; `SKILL.md` gives the
+details under "Pick one, in this order".
 
-1. The remote MCP server at `https://innstance.impossibuild.ai/mcp`. If your
-   tool list has tools from the `innstance` server, use them, and read their
-   names from the server's own tool list. Where a step below names a CLI
-   command, call the tool that does the same thing.
-2. `npx innstance`, which signs in and sets up the MCP server and the skill.
-   Check its provenance first, as `SKILL.md` describes under
-   "`npx innstance`".
-3. The `innstance` CLI, for power users, scripts and CI, and any step the MCP
-   tool list does not offer. Install it with the verified bootstrap below.
+1. Tools from a server named `innstance` are already in your tool list: use
+   them only after checking that the server's URL is exactly
+   `https://innstance.impossibuild.ai/mcp`. Read tool names from the server's
+   own tool list. Where a step below names a CLI command, call the tool that
+   does the same thing.
+2. The `innstance` CLI is already installed and signed in: keep using it.
+3. Otherwise check once, with a deadline, whether the MCP endpoint answers
+   (anything but `404`) and whether npm has the package. When both do, ask
+   the user before running `npx innstance`, after checking its provenance as
+   `SKILL.md` describes under "`npx innstance`"; it signs in and sets up the
+   MCP server and the skill. When only the MCP endpoint answers, connect it by
+   hand as `SKILL.md` describes.
+4. When neither answers, use the `innstance` CLI, the path for power users,
+   scripts and CI, and for any step the MCP tool list does not offer. Install
+   it with the verified bootstrap below.
 
-If the MCP endpoint answers `404`, or npm reports that the package does not
-exist, that way in is not available yet: use the CLI and tell the user.
-
-On Windows the native binary is optional: prefer MCP or `npx innstance`, and
-run the CLI inside WSL when you need it. If an antivirus blocks
-`innstance.exe`, do not ask the user to override it; use WSL or MCP.
+On Windows the native binary is optional: prefer MCP or `npx innstance` when
+they answer, and run the CLI inside WSL when WSL is set up. Otherwise the user
+chooses between installing WSL, which is their step, and the native
+`innstance.exe`. If an antivirus blocks `innstance.exe`, do not ask the user
+to override it; use WSL or MCP.
 
 ## Guardrails
 

@@ -6,24 +6,31 @@ a hosted assistant, then verify that it is really live.
 
 ## Start here: MCP or npx
 
-The main way in needs nothing of ours installed:
+The main ways in need no native program from us:
 
 - **Remote MCP server**: `https://innstance.impossibuild.ai/mcp`, over
   Streamable HTTP, server name `innstance`. The client sends an Innstance API
   token as a bearer token, read from an environment variable such as
   `INNSTANCE_TOKEN`; the token never goes in chat, a command argument or a
-  tracked file. Client examples are in [SKILL.md](SKILL.md#remote-mcp-preferred).
+  tracked file. Trust a client's `innstance` server only when it points at
+  exactly that URL. Client examples are in
+  [SKILL.md](SKILL.md#remote-mcp-preferred).
 - **`npx innstance`**: signs in through the browser, adds the MCP server to the
-  coding tools it finds, and installs this skill. It needs Node.js 18 or newer
-  and downloads no native binary. Check its provenance before the first run,
-  as [SKILL.md](SKILL.md#npx-innstance) describes.
+  coding tools it finds, and installs this skill. It needs Node.js 18 or newer.
+  It runs our JavaScript package from npm, which holds no native binary, and
+  it changes other tools' configuration, so the agent asks the user first and
+  checks the package's provenance before the first run, as
+  [SKILL.md](SKILL.md#npx-innstance) describes.
 
-Both are rolling out. If the MCP endpoint answers `404`, or npm reports that
-the package does not exist, use the CLI below for now.
+Both are rolling out. An agent checks once whether each exists before asking
+for a token or changing any file, and an agent that already has the CLI
+installed and signed in keeps using it; [SKILL.md](SKILL.md#pick-one-in-this-order)
+gives the order. If the MCP endpoint answers `404`, or npm reports that the
+package does not exist, use the CLI below for now.
 
-On Windows, neither needs an executable from us. When the CLI is needed there,
-run the macOS/Linux bootstrap inside WSL; the native `innstance.exe` is
-optional.
+On Windows, neither puts a native executable from us on the machine. When the
+CLI is needed there, use it inside WSL if WSL is set up; otherwise the user
+chooses between installing WSL and the optional native `innstance.exe`.
 
 ## Install the skill by hand
 
