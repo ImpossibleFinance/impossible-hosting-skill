@@ -149,14 +149,23 @@ published yet: use another way in. Never run a similarly named package.
 
 The native Windows binary is optional:
 
-1. Prefer the remote MCP server or `npx innstance`. Neither puts an
-   executable from us on the machine.
-2. When you need the CLI, use WSL. In an administrator PowerShell run
-   `wsl --install`, restart if Windows asks, open the Linux shell, and run the
-   macOS/Linux bootstrap below inside it. The CLI's sign-in then lives in the
-   Linux home directory, separate from Windows.
-3. Only when the user asks for the native `innstance.exe`, use the PowerShell
-   bootstrap below.
+1. Prefer the remote MCP server or `npx innstance` when the checks above show
+   them. Neither puts a native executable from us on the machine.
+2. If `innstance.exe` is already installed and signed in, keep using it.
+3. When you need the CLI and WSL is already set up (`wsl -l -q` lists a
+   distribution), run the macOS/Linux bootstrap below inside it. The CLI's
+   sign-in then lives in the Linux home directory, separate from Windows.
+4. When WSL is not set up, ask the user which they prefer: installing WSL, or
+   the native `innstance.exe` from the PowerShell bootstrap below. Installing
+   WSL is the user's step, in an administrator PowerShell (`wsl --install`),
+   and it may need a restart. Do not run it for them, and never restart the
+   machine yourself.
+
+From a Windows shell, run each CLI command inside WSL through a login shell,
+so that `~/.local/bin` is on PATH: `wsl -e bash -lc 'innstance status'`, or
+call `~/.local/bin/innstance` by its full path. A Windows folder such as
+`C:\Users\me\site` is `/mnt/c/Users/me/site` inside WSL:
+`wsl -e bash -lc 'cd /mnt/c/Users/me/site && innstance publish --name my-site index.html'`.
 
 If Microsoft Defender or another antivirus blocks or quarantines
 `innstance.exe`, do not ask the user to allow it, restore it, or turn
