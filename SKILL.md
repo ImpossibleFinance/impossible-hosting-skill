@@ -54,9 +54,10 @@ Decide before you ask the user for a token or change any file:
    those are what it answers a request without a token. `404` means it is not
    available yet. Any other status, such as a `403` or `429` from a proxy,
    firewall or rate limiter, a `5xx`, or no answer before the deadline, means
-   it cannot be used right now. An `E404` from npm means the package is not
-   published yet.
-4. **Use what is there.** When both answer, `npx innstance` is the quickest
+   it cannot be used right now. An `E404` from npm, or version
+   `0.0.0`, which is a placeholder with no code in it, means the package is
+   not published yet.
+4. **Use what is there.** When the MCP server answers and npm shows a version above `0.0.0`, `npx innstance` is the quickest
    start: it connects the MCP server for the user. When only the MCP server
    answers, connect it by hand as below; that needs the user to create a
    token and usually to restart the client. In every other case, including
